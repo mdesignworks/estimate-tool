@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M Design Works · 견적 산출 v7.1</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#E8A020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="견적산출">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f0f0f; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react,env">
+const { useState } = React;
+
+/* ── 현시세 반영 (2025) ── */
+const AUTO_CALC = {
+  "아파트":     { floorWood:0.75, floorTile:0.18, tileWall:0.15, wallpaper:2.5, paintWall:0.3,  ceilingCarp:0.60, windowPer:5,  outletPer:0.8, lightingPer:0.6, wastePer:0.10, ceilingArea:0.85, demoFloor:1.0, demoWall:0.5, demoCeiling:0.85, note:"거실·방 마루. 주방·욕실 타일. 벽지 중심." },
+  "상가":       { floorWood:0.50, floorTile:0.25, tileWall:0.10, wallpaper:1.8, paintWall:1.5,  ceilingCarp:0.75, windowPer:8,  outletPer:1.2, lightingPer:1.5, wastePer:0.15, ceilingArea:0.85, demoFloor:1.0, demoWall:0.6, demoCeiling:0.85, note:"업종따라 타일·도장 비율 조정 필요." },
+  "사무실":     { floorWood:0.80, floorTile:0.10, tileWall:0.05, wallpaper:2.5, paintWall:1.8,  ceilingCarp:0.80, windowPer:6,  outletPer:1.5, lightingPer:1.2, wastePer:0.12, ceilingArea:0.85, demoFloor:1.0, demoWall:0.4, demoCeiling:0.85, note:"카펫·LVT 바닥 많음. 콘센트 수량 많음." },
+  "카페":       { floorWood:0.50, floorTile:0.30, tileWall:0.25, wallpaper:1.5, paintWall:2.0,  ceilingCarp:0.80, windowPer:8,  outletPer:1.5, lightingPer:2.0, wastePer:0.15, ceilingArea:0.85, demoFloor:1.0, demoWall:0.7, demoCeiling:0.85, note:"조명·필름 비중 높음." },
+  "식당":       { floorWood:0.30, floorTile:0.50, tileWall:0.35, wallpaper:1.5, paintWall:1.8,  ceilingCarp:0.70, windowPer:8,  outletPer:1.5, lightingPer:1.5, wastePer:0.15, ceilingArea:0.85, demoFloor:1.0, demoWall:0.7, demoCeiling:0.85, note:"주방 타일·설비 비중 높음. 방수 필수." },
+  "도장(체육관)":{ floorWood:0.85, floorTile:0.05, tileWall:0.03, wallpaper:1.0, paintWall:2.5, ceilingCarp:0.50, windowPer:10, outletPer:0.5, lightingPer:0.4, wastePer:0.08, ceilingArea:0.85, demoFloor:1.0, demoWall:0.3, demoCeiling:0.50, note:"탄성매트·에폭시. 고천장 조명. 방음 별도." },
+  "병원":       { floorWood:0.60, floorTile:0.25, tileWall:0.20, wallpaper:2.2, paintWall:1.5,  ceilingCarp:0.80, windowPer:6,  outletPer:2.0, lightingPer:1.5, wastePer:0.15, ceilingArea:0.85, demoFloor:1.0, demoWall:0.5, demoCeiling:0.85, note:"전기 콘센트 최다. 위생·방수 기준 엄격." },
+  "숙박":       { floorWood:0.70, floorTile:0.20, tileWall:0.18, wallpaper:2.5, paintWall:0.8,  ceilingCarp:0.70, windowPer:6,  outletPer:1.2, lightingPer:1.5, wastePer:0.12, ceilingArea:0.85, demoFloor:1.0, demoWall:0.5, demoCeiling:0.85, note:"욕실 비중 높음. 방별 독립 설비." },
+  "기타":       { floorWood:0.70, floorTile:0.15, tileWall:0.10, wallpaper:2.0, paintWall:1.0,  ceilingCarp:0.70, windowPer:7,  outletPer:1.0, lightingPer:1.0, wastePer:0.12, ceilingArea:0.85, demoFloor:1.0, demoWall:0.5, demoCeiling:0.85, note:"평균값. 현장에 맞게 수동 조정 필요." },
+};
+const SITE_TYPES = Object.keys(AUTO_CALC);
+
+const TRADES = [
+  { id:"protection", label:"보양",        icon:"🛡️" },
+  { id:"demolition", label:"철거",        icon:"🔨" },
+  { id:"waste",      label:"폐기물처리",  icon:"🚛" },
+  { id:"window",     label:"창호·샷시",   icon:"🪟" },
+  { id:"plumbing",   label:"설비·배관",   icon:"🔧" },
+  { id:"electric",   label:"전기",        icon:"⚡" },
+  { id:"plaster",    label:"미장",        icon:"🪣" },
+  { id:"carpentry",  label:"목공",        icon:"🪚" },
+  { id:"tile",       label:"타일",        icon:"⬜" },
+  { id:"sanitary",   label:"위생기구",    icon:"🚿" },
+  { id:"floor",      label:"바닥",        icon:"🪵" },
+  { id:"paint",      label:"도장·페인트", icon:"🖌️" },
+  { id:"film",       label:"필름·시트",   icon:"🎞️" },
+  { id:"wallpaper",  label:"도배",        icon:"📋" },
+  { id:"furniture",  label:"가구·붙박이", icon:"🛋️" },
+  { id:"etc",        label:"기타공사",    icon:"📦" },
+];
+
+const PROTECT_MATS = [
+  { id:"cardboard", label:"골판지",       defP:1200 },
+  { id:"bubble",    label:"뽁뽁이(PE폼)", defP:2500 },
+  { id:"plywood",   label:"합판",         defP:5500 },
+  { id:"fabric",    label:"부직포",       defP:900  },
+];
+
+const FLOOR_MATS = [
+  { id:"tile_300", label:"타일 300×300", unit:"장", perSqm:11.11, loss:0.10, matP:5000,  instP:50000 },
+  { id:"tile_600", label:"타일 600×600", unit:"장", perSqm:2.78,  loss:0.10, matP:14000, instP:50000 },
+  { id:"tile_800", label:"타일 800×800", unit:"장", perSqm:1.5625,loss:0.10, matP:35000, instP:55000 },
+  { id:"wood",     label:"강마루 (8T)",  unit:"장", perSqm:6.25,  loss:0.05, matP:9000,  instP:17000 },
+  { id:"woodlvt",  label:"강화마루",     unit:"장", perSqm:6.25,  loss:0.05, matP:4500,  instP:15000 },
+  { id:"deco",     label:"데코타일",     unit:"장", perSqm:6.25,  loss:0.05, matP:3800,  instP:13000 },
+  { id:"lvt",      label:"LVT바닥재",    unit:"장", perSqm:4,     loss:0.05, matP:9000,  instP:18000 },
+  { id:"carpet",   label:"카펫타일",     unit:"장", perSqm:4,     loss:0.05, matP:7500,  instP:13000 },
+  { id:"epoxy",    label:"에폭시",       unit:"m²", perSqm:1,     loss:0.05, matP:35000, instP:40000 },
+];
+
+const TILE_MATS = [
+  { id:"t300",   label:"타일 300×300", unit:"장", perSqm:11.11, loss:0.15, matP:5000,  instP:50000 },
+  { id:"t600",   label:"타일 600×600", unit:"장", perSqm:2.78,  loss:0.12, matP:14000, instP:50000 },
+  { id:"t900",   label:"타일 900×900", unit:"장", perSqm:1.23,  loss:0.12, matP:35000, instP:55000 },
+  { id:"mosaic", label:"모자이크타일", unit:"장", perSqm:9,     loss:0.15, matP:8000,  instP:65000 },
+  { id:"marble", label:"대리석",       unit:"장", perSqm:2.78,  loss:0.10, matP:50000, instP:80000 },
+];
+
+const WINDOW_TYPES = [
+  { id:"al_single",  label:"알루미늄 단창",   defP:250000 },
+  { id:"al_double",  label:"알루미늄 이중창", defP:380000 },
+  { id:"pvc_single", label:"PVC 단창",        defP:300000 },
+  { id:"pvc_double", label:"PVC 이중창",      defP:450000 },
+  { id:"system",     label:"시스템창호",       defP:700000 },
+  { id:"front_door", label:"현관문",           defP:850000 },
+  { id:"room_door",  label:"방문",             defP:350000 },
+  { id:"pocket",     label:"포켓도어",         defP:550000 },
+];
+
+const SANITARY_ITEMS = [
+  { id:"wc",       label:"양변기",      defP:400000, instP:70000  },
+  { id:"wash",     label:"세면기",      defP:250000, instP:55000  },
+  { id:"shower",   label:"샤워부스",    defP:500000, instP:100000 },
+  { id:"bathtub",  label:"욕조",        defP:600000, instP:130000 },
+  { id:"bidet",    label:"비데",        defP:450000, instP:40000  },
+  { id:"faucet",   label:"수전 세트",   defP:180000, instP:45000  },
+  { id:"shower_f", label:"샤워수전",    defP:120000, instP:30000  },
+  { id:"sink",     label:"싱크대 수전", defP:130000, instP:30000  },
+];
+
+const FURNITURE_ITEMS = [
+  { id:"kitchen",    label:"주방가구(싱크대)", unit:"식", defP:2500000 },
+  { id:"wardrobe",   label:"붙박이장",          unit:"개", defP:800000  },
+  { id:"bathroom_f", label:"욕실장",            unit:"개", defP:250000  },
+  { id:"shoe",       label:"신발장",            unit:"개", defP:450000  },
+  { id:"tv_wall",    label:"TV장/아트월",       unit:"식", defP:1200000 },
+  { id:"custom",     label:"기타 가구",          unit:"개", defP:400000  },
+];
+
+const DEMO_ITEMS = [
+  { id:"floor",   label:"바닥 철거",  unit:"m²", defP:15000  },
+  { id:"wall",    label:"벽 철거",    unit:"m²", defP:20000  },
+  { id:"ceiling", label:"천장 철거",  unit:"m²", defP:15000  },
+  { id:"window",  label:"창호 철거",  unit:"개", defP:60000  },
+  { id:"kitchen", label:"주방 철거",  unit:"식", defP:300000 },
+  { id:"bath",    label:"욕실 철거",  unit:"개", defP:350000 },
+  { id:"etc",     label:"기타 철거",  unit:"식", defP:0      },
+];
+
+const WASTE_ITEMS = [
+  { id:"mixed",    label:"혼합 폐기물",     unit:"톤", defP:200000 },
+  { id:"concrete", label:"콘크리트 폐기물", unit:"톤", defP:160000 },
+  { id:"wood",     label:"폐목재",          unit:"톤", defP:140000 },
+  { id:"tile",     label:"폐타일/벽돌",     unit:"톤", defP:170000 },
+  { id:"truck1",   label:"1톤 트럭 운반",   unit:"대", defP:800000 },
+  { id:"truck5",   label:"5톤 트럭 운반",   unit:"대", defP:400000 },
+  { id:"dump",     label:"덤프트럭",         unit:"대", defP:650000 },
+  { id:"etc",      label:"기타",             unit:"식", defP:0      },
+];
+
+const WALLPAPER_TYPES = [
+  { id:"hanji",  label:"합지벽지",  sqmPerRoll:5.3, defP:14000  },
+  { id:"silk",   label:"실크벽지",  sqmPerRoll:4.5, defP:30000  },
+  { id:"import", label:"수입벽지",  sqmPerRoll:3.5, defP:65000  },
+  { id:"fabric", label:"패브릭벽지",sqmPerRoll:3.0, defP:90000  },
+];
+
+const MARGIN_PRESETS = [
+  { label:"지인·재계약", rate:0.15 },
+  { label:"일반 표준",   rate:0.25 },
+  { label:"복잡한 현장", rate:0.30 },
+  { label:"설계 포함",   rate:0.40 },
+];
+
+const fmt   = (n) => Math.round(n||0).toLocaleString("ko-KR");
+const newId = () => Date.now() + Math.random();
+const r1    = (n) => Math.round(n*10)/10;
+const r0    = (n) => Math.round(n);
+
+/* ── 스타일 ── */
+const S = {
+  root:{minHeight:"100vh",background:"#0f0f0f",color:"#ddd",fontFamily:"'Apple SD Gothic Neo',sans-serif"},
+  header:{background:"#161616",borderBottom:"1px solid #222",padding:"16px 20px 0"},
+  headerTop:{display:"flex",alignItems:"center",gap:12,marginBottom:16},
+  logo:{width:36,height:36,background:"#E8A020",color:"#111",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:18,borderRadius:6,flexShrink:0},
+  stepBar:{display:"flex"},
+  stepItem:{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1,paddingBottom:14},
+  stepDot:{width:26,height:26,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700},
+  main:{maxWidth:720,margin:"0 auto",padding:"20px 16px 40px"},
+  card:{background:"#161616",border:"1px solid #222",borderRadius:12,padding:"20px 18px",marginBottom:14},
+  cardTitle:{fontSize:16,fontWeight:700,color:"#fff",marginBottom:14},
+  subTitle:{fontSize:12,color:"#888",fontWeight:600,margin:"12px 0 8px",borderBottom:"1px solid #1e1e1e",paddingBottom:4},
+  grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12},
+  grid3:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10},
+  input:{background:"#0f0f0f",border:"1px solid #2a2a2a",borderRadius:8,padding:"9px 10px",color:"#fff",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box"},
+  btnPrimary:{background:"#E8A020",color:"#111",border:"none",borderRadius:8,padding:"11px 20px",fontWeight:700,fontSize:14,cursor:"pointer"},
+  btnSecondary:{background:"#1e1e1e",color:"#aaa",border:"1px solid #2a2a2a",borderRadius:8,padding:"11px 18px",fontWeight:600,fontSize:14,cursor:"pointer"},
+  tradeGrid:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20},
+  tradeBtn:{background:"#0f0f0f",border:"1px solid #222",borderRadius:10,padding:"12px 6px",cursor:"pointer",position:"relative",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:3},
+  tradeBtnOn:{border:"1px solid #E8A020",background:"#1a1200"},
+  rowBox:{background:"#0f0f0f",border:"1px solid #222",borderRadius:10,padding:14,marginBottom:10},
+  calcBox:{background:"#0a0a0a",border:"1px solid #1a1a1a",borderRadius:8,padding:"10px 12px",marginTop:10},
+  calcVal:{color:"#E8A020",fontWeight:700,fontSize:14,paddingTop:8},
+  autoPreview:{background:"#0d1a0d",border:"1px solid #2a4a2a",borderRadius:10,padding:"14px 16px",marginBottom:16},
+  autoGrid:{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8},
+  banner:{background:"#0d1a0d",border:"1px solid #2a4a2a",borderRadius:8,padding:"10px 14px",marginBottom:14,color:"#88cc88",fontSize:12,display:"flex",alignItems:"center"},
+  bannerBtn:{marginLeft:12,background:"transparent",border:"1px solid #4a8a4a",color:"#88cc88",borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer"},
+  infoBox:{background:"#0f0f0f",borderRadius:10,padding:"12px 16px"},
+  infoRow:{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #1a1a1a",fontSize:13},
+  table:{width:"100%",borderCollapse:"collapse",marginBottom:4},
+  th:{background:"#0f0f0f",padding:"9px 12px",textAlign:"left",fontSize:12,color:"#555",fontWeight:600,borderBottom:"1px solid #222"},
+  td:{padding:"10px 12px",fontSize:14,color:"#bbb"},
+  tdR:{padding:"10px 12px",fontSize:14,textAlign:"right"},
+  totalSection:{background:"#0f0f0f",borderRadius:10,padding:"14px 16px",marginTop:12},
+  totalRow:{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #1a1a1a",fontSize:14,color:"#666"},
+  perSqmBox:{display:"flex",background:"#0f0f0f",borderRadius:10,overflow:"hidden",border:"1px solid #222",marginTop:12},
+  perSqmItem:{flex:1,padding:"12px",textAlign:"center"},
+  /* 모드 토글 */
+  modeBar:{display:"flex",gap:0,marginBottom:12,borderRadius:7,overflow:"hidden",border:"1px solid #2a2a2a",width:"fit-content"},
+  modeBtn:{padding:"5px 14px",fontSize:11,fontWeight:600,cursor:"pointer",border:"none",background:"#1a1a1a",color:"#555"},
+  modeBtnOn:{background:"#E8A020",color:"#111"},
+};
+
+/* ── 헬퍼 컴포넌트 ── */
+function Section({title,children}){return <div style={S.card}><div style={S.cardTitle}>{title}</div>{children}</div>;}
+function SubTitle({c}){return <div style={S.subTitle}>{c}</div>;}
+function Field({label,children}){return <div style={{display:"flex",flexDirection:"column",gap:4}}><label style={{fontSize:11,color:"#666",fontWeight:500}}>{label}</label>{children}</div>;}
+function Inp({val,onChange,ph}){return <input style={S.input} type="number" value={val} onChange={e=>onChange(e.target.value)} placeholder={ph||""}/>;}
+function CRow({label,val,hl}){return <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1a1a1a"}}><span style={{color:"#555",fontSize:12}}>{label}</span><span style={{color:hl?"#E8A020":"#aaa",fontWeight:hl?700:400,fontSize:12}}>{val}</span></div>;}
+function Total({label,val}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#1a1200",border:"1px solid #E8A020",borderRadius:8,padding:"12px 16px",marginTop:12}}><span style={{color:"#E8A020",fontWeight:700,fontSize:13}}>{label}</span><span style={{color:"#fff",fontWeight:700,fontSize:17}}>{fmt(val)}원</span></div>;}
+function RowHeader({idx,onRemove}){return <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><span style={{color:"#E8A020",fontWeight:700,fontSize:12}}>#{idx+1}</span>{onRemove&&<button style={{background:"transparent",border:"none",color:"#444",fontSize:14,cursor:"pointer"}} onClick={onRemove}>✕</button>}</div>;}
+function AddBtn({onClick,c}){return <button style={{background:"transparent",border:"1px dashed #2a2a2a",color:"#555",borderRadius:8,padding:"9px",fontSize:13,cursor:"pointer",width:"100%",marginTop:6}} onClick={onClick}>{c}</button>;}
+function Btn({onClick,children}){return <button style={S.btnPrimary} onClick={onClick}>{children}</button>;}
+function BtnSec({onClick,children}){return <button style={S.btnSecondary} onClick={onClick}>{children}</button>;}
+function BtnRow({children}){return <div style={{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end",flexWrap:"wrap"}}>{children}</div>;}
+function AutoItem({label,val}){return <div style={{background:"#111",borderRadius:6,padding:"8px 10px"}}><div style={{color:"#666",fontSize:10,marginBottom:2}}>{label}</div><div style={{color:"#E8A020",fontWeight:700,fontSize:13}}>{val}</div></div>;}
+
+/* ── 모드 토글 버튼 ── */
+function ModeToggle({mode, onChange}){
+  return (
+    <div style={S.modeBar}>
+      <button style={{...S.modeBtn,...(mode==="calc"?S.modeBtnOn:{})}} onClick={()=>onChange("calc")}>면적·수량 계산</button>
+      <button style={{...S.modeBtn,...(mode==="direct"?S.modeBtnOn:{})}} onClick={()=>onChange("direct")}>금액 직접입력</button>
+    </div>
+  );
+}
+
+/* ── 직접입력 행 (공통) ── */
+function DirectRow({row, updateRow, setter, onRemove, idx, label}){
+  return (
+    <div style={S.rowBox}>
+      <RowHeader idx={idx} onRemove={onRemove}/>
+      <ModeToggle mode={row.mode||"calc"} onChange={v=>updateRow(setter,row.id,"mode",v)}/>
+      <div style={S.grid2}>
+        <Field label={label||"항목명/위치"}><input style={S.input} value={row.label||""} onChange={e=>updateRow(setter,row.id,"label",e.target.value)} placeholder="예) 거실 바닥 필름"/></Field>
+        <Field label="금액 (원)"><Inp val={row.directAmt} onChange={v=>updateRow(setter,row.id,"directAmt",v)} ph="0"/></Field>
+      </div>
+      {parseFloat(row.directAmt)>0 && <div style={{color:"#E8A020",fontWeight:700,fontSize:14,paddingTop:4}}>소계 {fmt(parseFloat(row.directAmt))}원</div>}
+    </div>
+  );
+}
+
+/* ── App ── */
+function App(){
+  const [step,         setStep]         = useState("info");
+  const [autoApplied,  setAutoApplied]  = useState(false);
+  const [marginRate,   setMarginRate]   = useState(0.25);
+
+  const [siteInfo, setSiteInfo] = useState({
+    name:"", type:"아파트", area:"", client:"",
+    date:new Date().toISOString().slice(0,10), memo:"",
+  });
+  const [selectedTrades, setSelectedTrades] = useState([]);
+
+  /* ── 공종별 state ── */
+  const [protectRows,   setProtectRows]   = useState([
+    {id:newId(),location:"엘리베이터",matId:"plywood",  qty:"1",unit:"식",customP:"200000"},
+    {id:newId(),location:"복도·계단", matId:"cardboard",qty:"", unit:"m²",customP:""},
+    {id:newId(),location:"실내 바닥", matId:"cardboard",qty:"", unit:"m²",customP:""},
+  ]);
+  const [demoRows,      setDemoRows]      = useState([{id:newId(),itemId:"floor",qty:"",customP:""}]);
+  const [wasteRows,     setWasteRows]     = useState([{id:newId(),itemId:"mixed",qty:"",customP:""}]);
+  const [windowRows,    setWindowRows]    = useState([{id:newId(),typeId:"pvc_double",label:"",qty:"",customP:""}]);
+  const [plumbing,      setPlumbing]      = useState({hotLen:"",coldLen:"",drainLen:"",pipeMatP:20000,pipeInstP:35000,bathCount:"",kitchenCount:"",bathSetP:250000,kitchenSetP:200000,etcAmt:""});
+  const [electric,      setElectric]      = useState({outlet:"",switch_:"",lighting:"",panel:"1",outletP:25000,switchP:20000,lightingP:35000,panelP:750000,outletInstP:35000,switchInstP:25000,lightingInstP:30000,etcAmt:""});
+  const [plaster,       setPlaster]       = useState({area:"",matP:13000,instP:30000,etcAmt:""});
+  const [carpentry,     setCarpentry]     = useState({
+    ceilingArea:"",wallArea:"",partitionArea:"",
+    ceilingP:50000,wallP:65000,partitionP:75000,
+    moldingLen:"",moldingP:8000,moldingInstP:5000,
+    baseLen:"",baseP:5000,baseInstP:6000,etcAmt:"",
+    mode:"calc", directAmt:"",
+  });
+  const [tileRows,      setTileRows]      = useState([{id:newId(),space:"",location:"바닥",matId:"t300",area:"",customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""}]);
+  const [sanitaryRows,  setSanitaryRows]  = useState([{id:newId(),itemId:"wc",qty:"1",customMatP:"",customInstP:""}]);
+  const [floorRows,     setFloorRows]     = useState([{id:newId(),space:"",matId:"wood",area:"",customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""}]);
+  const [paint,         setPaint]         = useState({wallArea:"",ceilingArea:"",wallCoat:"2",ceilingCoat:"2",puttyP:12000,paintMatP:8000,paintInstP:25000,ceilMatP:6000,ceilInstP:20000,etcAmt:""});
+  const [filmRows,      setFilmRows]      = useState([{id:newId(),location:"",area:"",type:"일반시트",matP:15000,instP:18000,mode:"calc",label:"",directAmt:""}]);
+  const [wallpaper,     setWallpaper]     = useState({wallTypeId:"silk",wallArea:"",ceilTypeId:"hanji",ceilingArea:"",wallInstP:13000,ceilInstP:10000,etcAmt:"",mode:"calc",directAmt:""});
+  const [furnitureRows, setFurnitureRows] = useState([{id:newId(),itemId:"kitchen",qty:"1",customP:""}]);
+  const [etcRows,       setEtcRows]       = useState([{id:newId(),memo:"",amt:""}]);
+
+  /* ── 헬퍼 ── */
+  const toggleTrade = (id) => setSelectedTrades(p=>p.includes(id)?p.filter(t=>t!==id):[...p,id]);
+  const addRow  = (setter,tmpl) => setter(p=>[...p,{...tmpl,id:newId()}]);
+  const removeRow = (setter,id) => setter(p=>p.filter(r=>r.id!==id));
+  const updateRow = (setter,id,f,v) => setter(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
+
+  /* ── 자동계산 ── */
+  const applyAutoCalc = () => {
+    const area=parseFloat(siteInfo.area);
+    if(!area){alert("총 면적을 먼저 입력하세요.");return;}
+    const py=area/3.305;
+    const s=AUTO_CALC[siteInfo.type]||AUTO_CALC["기타"];
+    setFloorRows([
+      {id:newId(),space:"마루/장판 구간",matId:"wood",    area:String(r1(area*s.floorWood)),customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""},
+      {id:newId(),space:"타일 구간",     matId:"tile_600",area:String(r1(area*s.floorTile)),customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""},
+    ]);
+    setTileRows([
+      {id:newId(),space:"바닥",location:"바닥",matId:"t300",area:String(r1(area*s.floorTile)),customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""},
+      {id:newId(),space:"벽", location:"벽",  matId:"t300",area:String(r1(area*s.tileWall)), customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""},
+    ]);
+    setCarpentry(p=>({...p,ceilingArea:String(r1(area*s.ceilingCarp)),mode:"calc",directAmt:""}));
+    setWallpaper(p=>({...p,wallArea:String(r1(area*s.wallpaper)),ceilingArea:String(r1(area*s.ceilingArea)),mode:"calc",directAmt:""}));
+    setPaint(p=>({...p,wallArea:String(r1(area*s.paintWall)),ceilingArea:String(r1(area*s.ceilingArea))}));
+    setWindowRows([{id:newId(),typeId:"pvc_double",label:"창호",qty:String(r0(py/s.windowPer)),customP:""}]);
+    setElectric(p=>({...p,outlet:String(r0(py*s.outletPer)),switch_:String(r0(py*s.outletPer*0.5)),lighting:String(r0(py*s.lightingPer))}));
+    setDemoRows([
+      {id:newId(),itemId:"floor",  qty:String(r1(area*s.demoFloor)),  customP:""},
+      {id:newId(),itemId:"wall",   qty:String(r1(area*s.demoWall)),   customP:""},
+      {id:newId(),itemId:"ceiling",qty:String(r1(area*s.demoCeiling)),customP:""},
+    ]);
+    setWasteRows([{id:newId(),itemId:"mixed",qty:String(r1(area*s.wastePer)),customP:""}]);
+    setProtectRows([
+      {id:newId(),location:"엘리베이터",matId:"plywood",  qty:"1",             unit:"식",customP:"200000"},
+      {id:newId(),location:"복도·계단", matId:"cardboard",qty:String(r1(py*2)),unit:"m²",customP:""},
+      {id:newId(),location:"실내 바닥", matId:"cardboard",qty:String(r1(area)), unit:"m²",customP:""},
+    ]);
+    setSelectedTrades(["protection","demolition","waste","window","plumbing","electric","carpentry","tile","floor","wallpaper"]);
+    setAutoApplied(true);
+    setStep("detail");
+  };
+
+  /* ── 계산 함수 ── */
+  const calcProtectRow = (row) => {
+    const mat=PROTECT_MATS.find(m=>m.id===row.matId);
+    if(!mat) return null;
+    return {mat, unitP:parseFloat(row.customP)||mat.defP, qty:parseFloat(row.qty)||0, total:(parseFloat(row.customP)||mat.defP)*(parseFloat(row.qty)||0)};
+  };
+  const calcDemoRow  = (row) => { const i=DEMO_ITEMS.find(x=>x.id===row.itemId);  if(!i) return null; const p=parseFloat(row.customP)||i.defP,q=parseFloat(row.qty)||0; return {item:i,unitP:p,qty:q,total:p*q}; };
+  const calcWasteRow = (row) => { const i=WASTE_ITEMS.find(x=>x.id===row.itemId); if(!i) return null; const p=parseFloat(row.customP)||i.defP,q=parseFloat(row.qty)||0; return {item:i,unitP:p,qty:q,total:p*q}; };
+  const calcWindowRow= (row) => { const wt=WINDOW_TYPES.find(t=>t.id===row.typeId); const p=parseFloat(row.customP)||(wt?wt.defP:0),q=parseFloat(row.qty)||0; return {wt,unitP:p,qty:q,total:p*q}; };
+  const calcPlumbing = () => {
+    const len=(parseFloat(plumbing.hotLen)||0)+(parseFloat(plumbing.coldLen)||0)+(parseFloat(plumbing.drainLen)||0);
+    const pipe=len*(parseFloat(plumbing.pipeMatP)+parseFloat(plumbing.pipeInstP));
+    const fix=(parseFloat(plumbing.bathCount)||0)*parseFloat(plumbing.bathSetP)+(parseFloat(plumbing.kitchenCount)||0)*parseFloat(plumbing.kitchenSetP);
+    return {total:pipe+fix+(parseFloat(plumbing.etcAmt)||0)};
+  };
+  const calcElectric = () => {
+    const o=(parseFloat(electric.outlet)||0)*(parseFloat(electric.outletP)+parseFloat(electric.outletInstP));
+    const sw=(parseFloat(electric.switch_)||0)*(parseFloat(electric.switchP)+parseFloat(electric.switchInstP));
+    const l=(parseFloat(electric.lighting)||0)*(parseFloat(electric.lightingP)+parseFloat(electric.lightingInstP));
+    const p=(parseFloat(electric.panel)||0)*parseFloat(electric.panelP);
+    return {total:o+sw+l+p+(parseFloat(electric.etcAmt)||0)};
+  };
+  const calcPlaster   = () => ({total:(parseFloat(plaster.area)||0)*(parseFloat(plaster.matP)+parseFloat(plaster.instP))+(parseFloat(plaster.etcAmt)||0)});
+  const calcCarpentry = () => {
+    if(carpentry.mode==="direct") return {total:parseFloat(carpentry.directAmt)||0};
+    const cc=(parseFloat(carpentry.ceilingArea)||0)*parseFloat(carpentry.ceilingP);
+    const wc=(parseFloat(carpentry.wallArea)||0)*parseFloat(carpentry.wallP);
+    const pc=(parseFloat(carpentry.partitionArea)||0)*parseFloat(carpentry.partitionP);
+    const mc=(parseFloat(carpentry.moldingLen)||0)*(parseFloat(carpentry.moldingP)+parseFloat(carpentry.moldingInstP));
+    const bc=(parseFloat(carpentry.baseLen)||0)*(parseFloat(carpentry.baseP)+parseFloat(carpentry.baseInstP));
+    return {total:cc+wc+pc+mc+bc+(parseFloat(carpentry.etcAmt)||0)};
+  };
+  const calcTileRow = (row) => {
+    if(row.mode==="direct") return {direct:true,total:parseFloat(row.directAmt)||0};
+    const mat=TILE_MATS.find(m=>m.id===row.matId); if(!mat) return null;
+    const area=parseFloat(row.area)||0, matP=parseFloat(row.customMatP)||mat.matP, instP=parseFloat(row.customInstP)||mat.instP;
+    const qty=Math.ceil(area*mat.perSqm*(1+mat.loss)), matPerSqm=matP*mat.perSqm*(1+mat.loss);
+    return {mat,area,qty,matP,instP,matCost:qty*matP,instCost:area*instP,matPerSqm,total:qty*matP+area*instP};
+  };
+  const calcSanitaryRow = (row) => {
+    const item=SANITARY_ITEMS.find(i=>i.id===row.itemId); if(!item) return null;
+    const matP=parseFloat(row.customMatP)||item.defP, instP=parseFloat(row.customInstP)||item.instP, qty=parseFloat(row.qty)||0;
+    return {item,qty,matP,instP,matCost:qty*matP,instCost:qty*instP,total:qty*(matP+instP)};
+  };
+  const calcFloorRow = (row) => {
+    if(row.mode==="direct") return {direct:true,total:parseFloat(row.directAmt)||0};
+    const mat=FLOOR_MATS.find(m=>m.id===row.matId); if(!mat) return null;
+    const area=parseFloat(row.area)||0, matP=parseFloat(row.customMatP)||mat.matP, instP=parseFloat(row.customInstP)||mat.instP;
+    const qty=Math.ceil(area*mat.perSqm*(1+mat.loss)), matPerSqm=matP*mat.perSqm*(1+mat.loss);
+    return {mat,area,qty,matP,instP,matCost:qty*matP,instCost:area*instP,matPerSqm,total:qty*matP+area*instP};
+  };
+  const calcPaint = () => {
+    const wa=parseFloat(paint.wallArea)||0, ca=parseFloat(paint.ceilingArea)||0;
+    const wc=wa*(parseFloat(paint.puttyP)+parseFloat(paint.paintMatP)*parseFloat(paint.wallCoat)+parseFloat(paint.paintInstP));
+    const cc=ca*(parseFloat(paint.ceilMatP)*parseFloat(paint.ceilingCoat)+parseFloat(paint.ceilInstP));
+    return {total:wc+cc+(parseFloat(paint.etcAmt)||0)};
+  };
+  const calcFilmRow = (row) => {
+    if(row.mode==="direct") return {direct:true,total:parseFloat(row.directAmt)||0};
+    const area=parseFloat(row.area)||0;
+    return {area,total:area*((parseFloat(row.matP)||0)+(parseFloat(row.instP)||0))};
+  };
+  const calcWallpaper = () => {
+    if(wallpaper.mode==="direct") return {direct:true,total:parseFloat(wallpaper.directAmt)||0};
+    const wallType=WALLPAPER_TYPES.find(t=>t.id===wallpaper.wallTypeId)||WALLPAPER_TYPES[1];
+    const ceilType=WALLPAPER_TYPES.find(t=>t.id===wallpaper.ceilTypeId)||WALLPAPER_TYPES[0];
+    const wa=parseFloat(wallpaper.wallArea)||0, ca=parseFloat(wallpaper.ceilingArea)||0;
+    const wr=Math.ceil(wa/wallType.sqmPerRoll), cr=Math.ceil(ca/ceilType.sqmPerRoll);
+    const wmc=wr*wallType.defP, wic=wa*parseFloat(wallpaper.wallInstP);
+    const cmc=cr*ceilType.defP, cic=ca*parseFloat(wallpaper.ceilInstP);
+    return {wr,cr,wallType,ceilType,wmc,wic,cmc,cic,total:wmc+wic+cmc+cic+(parseFloat(wallpaper.etcAmt)||0)};
+  };
+  const calcFurnitureRow = (row) => {
+    const item=FURNITURE_ITEMS.find(i=>i.id===row.itemId); if(!item) return null;
+    const p=parseFloat(row.customP)||item.defP, q=parseFloat(row.qty)||0;
+    return {item,unitP:p,qty:q,total:p*q};
+  };
+
+  const costTotals = {
+    protection: protectRows.reduce((s,r)=>{const c=calcProtectRow(r);return s+(c?c.total:0);},0),
+    demolition: demoRows.reduce((s,r)=>{const c=calcDemoRow(r);return s+(c?c.total:0);},0),
+    waste:      wasteRows.reduce((s,r)=>{const c=calcWasteRow(r);return s+(c?c.total:0);},0),
+    window:     windowRows.reduce((s,r)=>s+calcWindowRow(r).total,0),
+    plumbing:   calcPlumbing().total,
+    electric:   calcElectric().total,
+    plaster:    calcPlaster().total,
+    carpentry:  calcCarpentry().total,
+    tile:       tileRows.reduce((s,r)=>{const c=calcTileRow(r);return s+(c?c.total:0);},0),
+    sanitary:   sanitaryRows.reduce((s,r)=>{const c=calcSanitaryRow(r);return s+(c?c.total:0);},0),
+    floor:      floorRows.reduce((s,r)=>{const c=calcFloorRow(r);return s+(c?c.total:0);},0),
+    paint:      calcPaint().total,
+    film:       filmRows.reduce((s,r)=>{const c=calcFilmRow(r);return s+(c?c.total:0);},0),
+    wallpaper:  calcWallpaper().total,
+    furniture:  furnitureRows.reduce((s,r)=>{const c=calcFurnitureRow(r);return s+(c?c.total:0);},0),
+    etc:        etcRows.reduce((s,r)=>s+(parseFloat(r.amt)||0),0),
+  };
+  const costTotal   = selectedTrades.reduce((s,id)=>s+(costTotals[id]||0),0);
+  const marginAmt   = costTotal*marginRate;
+  const supplyPrice = costTotal+marginAmt;
+  const vatAmt      = supplyPrice*0.1;
+  const finalPrice  = supplyPrice+vatAmt;
+
+  const stepList  = ["info","trades","detail","summary"];
+  const stepsDone = (s) => stepList.indexOf(step)>stepList.indexOf(s);
+  const std       = AUTO_CALC[siteInfo.type]||AUTO_CALC["기타"];
+
+  return (
+    <div style={S.root}>
+      {/* 헤더 */}
+      <header style={S.header}>
+        <div style={S.headerTop}>
+          <div style={S.logo}>M</div>
+          <div>
+            <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>M Design Works</div>
+            <div style={{fontSize:12,color:"#666"}}>인테리어 견적 산출 v7.1</div>
+          </div>
+        </div>
+        <div style={S.stepBar}>
+          {[["info","현장정보"],["trades","공종선택"],["detail","상세입력"],["summary","최종견적"]].map(([s,label],i)=>(
+            <div key={s} style={S.stepItem}>
+              <div style={{...S.stepDot,background:step===s?"#E8A020":stepsDone(s)?"#555":"#222",border:step===s?"2px solid #E8A020":"2px solid #333",color:step===s?"#111":"#fff"}}>
+                {stepsDone(s)?"✓":i+1}
+              </div>
+              <div style={{fontSize:10,fontWeight:500,color:step===s?"#E8A020":"#555"}}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </header>
+
+      <main style={S.main}>
+
+        {/* ─ STEP 1 ─ */}
+        {step==="info" && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>현장 기본정보</div>
+            <div style={S.grid2}>
+              <Field label="현장명 *"><input style={S.input} placeholder="예) 대구 수성구 302호" value={siteInfo.name} onChange={e=>setSiteInfo({...siteInfo,name:e.target.value})}/></Field>
+              <Field label="고객명"><input style={S.input} placeholder="예) 홍길동" value={siteInfo.client} onChange={e=>setSiteInfo({...siteInfo,client:e.target.value})}/></Field>
+              <Field label="현장유형 *">
+                <select style={S.input} value={siteInfo.type} onChange={e=>setSiteInfo({...siteInfo,type:e.target.value})}>
+                  {SITE_TYPES.map(t=><option key={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="총 면적 (m²) *"><input style={S.input} type="number" placeholder="예) 106" value={siteInfo.area} onChange={e=>setSiteInfo({...siteInfo,area:e.target.value})}/></Field>
+              <Field label="작성일"><input style={S.input} type="date" value={siteInfo.date} onChange={e=>setSiteInfo({...siteInfo,date:e.target.value})}/></Field>
+              <Field label="특이사항"><input style={S.input} placeholder="발코니 확장, 욕실 2개 등" value={siteInfo.memo} onChange={e=>setSiteInfo({...siteInfo,memo:e.target.value})}/></Field>
+            </div>
+            {siteInfo.area && (
+              <div style={S.autoPreview}>
+                <div style={{color:"#88cc88",fontWeight:600,fontSize:13,marginBottom:10}}>
+                  📐 {siteInfo.type} 자동산출 예상값 ({siteInfo.area}m² · 약 {Math.round(parseFloat(siteInfo.area)/3.305)}평)
+                </div>
+                <div style={S.autoGrid}>
+                  {[
+                    ["마루/장판", r1(parseFloat(siteInfo.area)*std.floorWood)+"m²"],
+                    ["타일 바닥", r1(parseFloat(siteInfo.area)*std.floorTile)+"m²"],
+                    ["타일 벽",   r1(parseFloat(siteInfo.area)*std.tileWall)+"m²"],
+                    ["도배 벽",   r1(parseFloat(siteInfo.area)*std.wallpaper)+"m²"],
+                    ["도장 벽",   r1(parseFloat(siteInfo.area)*std.paintWall)+"m²"],
+                    ["목공 천장", r1(parseFloat(siteInfo.area)*std.ceilingCarp)+"m²"],
+                    ["창호",      r0(parseFloat(siteInfo.area)/3.305/std.windowPer)+"개"],
+                    ["콘센트",    r0(parseFloat(siteInfo.area)/3.305*std.outletPer)+"개"],
+                    ["조명",      r0(parseFloat(siteInfo.area)/3.305*std.lightingPer)+"개"],
+                    ["폐기물",    r1(parseFloat(siteInfo.area)*std.wastePer)+"톤"],
+                  ].map(([l,v])=><AutoItem key={l} label={l} val={v}/>)}
+                </div>
+                <div style={{fontSize:11,color:"#666",marginTop:8}}>💡 {std.note}</div>
+              </div>
+            )}
+            <BtnRow>
+              <button style={{...S.btnPrimary,background:"#1a3a1a",color:"#88cc88",border:"1px solid #2a5a2a",flex:1}}
+                onClick={()=>{if(!siteInfo.name||!siteInfo.area){alert("현장명·면적 필수");return;}applyAutoCalc();}}>
+                ⚡ 자동계산 적용
+              </button>
+              <Btn onClick={()=>{if(!siteInfo.name||!siteInfo.area){alert("현장명·면적 필수");return;}setStep("trades");}}>수동 →</Btn>
+            </BtnRow>
+          </div>
+        )}
+
+        {/* ─ STEP 2 ─ */}
+        {step==="trades" && (
+          <div style={S.card}>
+            <div style={S.cardTitle}>공종 선택</div>
+            <div style={S.tradeGrid}>
+              {TRADES.map((t,i)=>{
+                const active=selectedTrades.includes(t.id);
+                return (
+                  <button key={t.id} style={{...S.tradeBtn,...(active?S.tradeBtnOn:{})}} onClick={()=>toggleTrade(t.id)}>
+                    <span style={{fontSize:20}}>{t.icon}</span>
+                    <span style={{color:active?"#E8A020":"#ccc",fontWeight:600,fontSize:12,marginTop:2}}>{t.label}</span>
+                    <span style={{color:"#444",fontSize:10}}>{i+1}</span>
+                    {active&&<span style={{position:"absolute",top:6,right:8,color:"#E8A020",fontSize:12}}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <BtnRow>
+              <BtnSec onClick={()=>setStep("info")}>← 이전</BtnSec>
+              <Btn onClick={()=>{if(!selectedTrades.length){alert("공종을 선택하세요");return;}setStep("detail");}}>다음 →</Btn>
+            </BtnRow>
+          </div>
+        )}
+
+        {/* ─ STEP 3 ─ */}
+        {step==="detail" && (
+          <div>
+            {autoApplied && (
+              <div style={S.banner}>
+                ⚡ {siteInfo.type} 기준 자동적용 · 수치 확인 후 수정하세요
+                <button style={S.bannerBtn} onClick={applyAutoCalc}>재적용</button>
+              </div>
+            )}
+
+            {/* 보양 */}
+            {selectedTrades.includes("protection") && (
+              <Section title="🛡️ 보양">
+                {protectRows.map((row,i)=>{
+                  const mat=PROTECT_MATS.find(m=>m.id===row.matId), c=calcProtectRow(row);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={protectRows.length>1?()=>removeRow(setProtectRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="위치"><input style={S.input} value={row.location} onChange={e=>updateRow(setProtectRows,row.id,"location",e.target.value)} placeholder="엘리베이터/복도..."/></Field>
+                        <Field label="보양재">
+                          <select style={S.input} value={row.matId} onChange={e=>updateRow(setProtectRows,row.id,"matId",e.target.value)}>
+                            {PROTECT_MATS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="단위">
+                          <select style={S.input} value={row.unit} onChange={e=>updateRow(setProtectRows,row.id,"unit",e.target.value)}>
+                            {["m²","식","개"].map(u=><option key={u}>{u}</option>)}
+                          </select>
+                        </Field>
+                        <Field label={"수량 ("+row.unit+")"}><Inp val={row.qty} onChange={v=>updateRow(setProtectRows,row.id,"qty",v)} ph="0"/></Field>
+                        <Field label={"단가 (기본 "+fmt(mat?mat.defP:0)+"원)"}><Inp val={row.customP} onChange={v=>updateRow(setProtectRows,row.id,"customP",v)} ph={fmt(mat?mat.defP:0)}/></Field>
+                        {c&&parseFloat(row.qty)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setProtectRows,{location:"",matId:"cardboard",qty:"",unit:"m²",customP:""})} c="+ 항목 추가"/>
+                <Total label="보양 합계" val={costTotals.protection}/>
+              </Section>
+            )}
+
+            {/* 철거 */}
+            {selectedTrades.includes("demolition") && (
+              <Section title="🔨 철거">
+                {demoRows.map((row,i)=>{
+                  const c=calcDemoRow(row), item=DEMO_ITEMS.find(it=>it.id===row.itemId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={demoRows.length>1?()=>removeRow(setDemoRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="철거 항목">
+                          <select style={S.input} value={row.itemId} onChange={e=>updateRow(setDemoRows,row.id,"itemId",e.target.value)}>
+                            {DEMO_ITEMS.map(it=><option key={it.id} value={it.id}>{it.label} ({it.unit})</option>)}
+                          </select>
+                        </Field>
+                        <Field label={"수량 ("+(item?item.unit:"")+")"}><Inp val={row.qty} onChange={v=>updateRow(setDemoRows,row.id,"qty",v)} ph="0"/></Field>
+                        <Field label={"단가 (기본 "+fmt(item?item.defP:0)+"원)"}><Inp val={row.customP} onChange={v=>updateRow(setDemoRows,row.id,"customP",v)} ph={fmt(item?item.defP:0)}/></Field>
+                        {c&&c.qty>0&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setDemoRows,{itemId:"wall",qty:"",customP:""})} c="+ 항목 추가"/>
+                <Total label="철거 합계" val={costTotals.demolition}/>
+              </Section>
+            )}
+
+            {/* 폐기물 */}
+            {selectedTrades.includes("waste") && (
+              <Section title="🚛 폐기물 처리">
+                {wasteRows.map((row,i)=>{
+                  const c=calcWasteRow(row), item=WASTE_ITEMS.find(it=>it.id===row.itemId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={wasteRows.length>1?()=>removeRow(setWasteRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="처리 항목">
+                          <select style={S.input} value={row.itemId} onChange={e=>updateRow(setWasteRows,row.id,"itemId",e.target.value)}>
+                            {WASTE_ITEMS.map(it=><option key={it.id} value={it.id}>{it.label} ({it.unit})</option>)}
+                          </select>
+                        </Field>
+                        <Field label={"수량 ("+(item?item.unit:"")+")"}><Inp val={row.qty} onChange={v=>updateRow(setWasteRows,row.id,"qty",v)} ph="0"/></Field>
+                        <Field label={"단가 (기본 "+fmt(item?item.defP:0)+"원)"}><Inp val={row.customP} onChange={v=>updateRow(setWasteRows,row.id,"customP",v)} ph={fmt(item?item.defP:0)}/></Field>
+                        {c&&c.qty>0&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setWasteRows,{itemId:"truck1",qty:"",customP:""})} c="+ 항목 추가"/>
+                <Total label="폐기물 합계" val={costTotals.waste}/>
+              </Section>
+            )}
+
+            {/* 창호 */}
+            {selectedTrades.includes("window") && (
+              <Section title="🪟 창호·샷시">
+                {windowRows.map((row,i)=>{
+                  const c=calcWindowRow(row), wt=WINDOW_TYPES.find(t=>t.id===row.typeId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={windowRows.length>1?()=>removeRow(setWindowRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="위치/명칭"><input style={S.input} value={row.label} onChange={e=>updateRow(setWindowRows,row.id,"label",e.target.value)} placeholder="거실 창"/></Field>
+                        <Field label="종류">
+                          <select style={S.input} value={row.typeId} onChange={e=>updateRow(setWindowRows,row.id,"typeId",e.target.value)}>
+                            {WINDOW_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="수량 (개)"><Inp val={row.qty} onChange={v=>updateRow(setWindowRows,row.id,"qty",v)} ph="0"/></Field>
+                        <Field label={"단가 (기본 "+fmt(wt?wt.defP:0)+"원)"}><Inp val={row.customP} onChange={v=>updateRow(setWindowRows,row.id,"customP",v)} ph={fmt(wt?wt.defP:0)}/></Field>
+                        {c.qty>0&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setWindowRows,{typeId:"pvc_double",label:"",qty:"",customP:""})} c="+ 창호 추가"/>
+                <Total label="창호 합계" val={costTotals.window}/>
+              </Section>
+            )}
+
+            {/* 설비 */}
+            {selectedTrades.includes("plumbing") && (
+              <Section title="🔧 설비·배관">
+                <SubTitle c="배관 길이"/>
+                <div style={S.grid3}>
+                  <Field label="급수 배관 (m)"><Inp val={plumbing.hotLen}     onChange={v=>setPlumbing({...plumbing,hotLen:v})}     ph="0"/></Field>
+                  <Field label="냉수 배관 (m)"><Inp val={plumbing.coldLen}    onChange={v=>setPlumbing({...plumbing,coldLen:v})}    ph="0"/></Field>
+                  <Field label="배수 배관 (m)"><Inp val={plumbing.drainLen}   onChange={v=>setPlumbing({...plumbing,drainLen:v})}   ph="0"/></Field>
+                  <Field label="재료비 (/m)">  <Inp val={plumbing.pipeMatP}  onChange={v=>setPlumbing({...plumbing,pipeMatP:v})}/></Field>
+                  <Field label="시공비 (/m)">  <Inp val={plumbing.pipeInstP} onChange={v=>setPlumbing({...plumbing,pipeInstP:v})}/></Field>
+                </div>
+                <SubTitle c="욕실·주방 세팅비"/>
+                <div style={S.grid3}>
+                  <Field label="욕실 수 (개)">      <Inp val={plumbing.bathCount}    onChange={v=>setPlumbing({...plumbing,bathCount:v})}    ph="0"/></Field>
+                  <Field label="욕실 세팅비 (/개)"> <Inp val={plumbing.bathSetP}    onChange={v=>setPlumbing({...plumbing,bathSetP:v})}/></Field>
+                  <Field label="주방 수 (개)">      <Inp val={plumbing.kitchenCount} onChange={v=>setPlumbing({...plumbing,kitchenCount:v})} ph="0"/></Field>
+                  <Field label="주방 세팅비 (/개)"> <Inp val={plumbing.kitchenSetP} onChange={v=>setPlumbing({...plumbing,kitchenSetP:v})}/></Field>
+                  <Field label="기타 금액">          <Inp val={plumbing.etcAmt}      onChange={v=>setPlumbing({...plumbing,etcAmt:v})}      ph="0"/></Field>
+                </div>
+                <Total label="설비 합계" val={costTotals.plumbing}/>
+              </Section>
+            )}
+
+            {/* 전기 */}
+            {selectedTrades.includes("electric") && (
+              <Section title="⚡ 전기">
+                <div style={S.grid3}>
+                  <Field label="콘센트 (개)">       <Inp val={electric.outlet}       onChange={v=>setElectric({...electric,outlet:v})}       ph="0"/></Field>
+                  <Field label="재료단가 (/개)">    <Inp val={electric.outletP}      onChange={v=>setElectric({...electric,outletP:v})}/></Field>
+                  <Field label="시공단가 (/개)">    <Inp val={electric.outletInstP}  onChange={v=>setElectric({...electric,outletInstP:v})}/></Field>
+                  <Field label="스위치 (개)">       <Inp val={electric.switch_}      onChange={v=>setElectric({...electric,switch_:v})}      ph="0"/></Field>
+                  <Field label="재료단가 (/개)">    <Inp val={electric.switchP}      onChange={v=>setElectric({...electric,switchP:v})}/></Field>
+                  <Field label="시공단가 (/개)">    <Inp val={electric.switchInstP}  onChange={v=>setElectric({...electric,switchInstP:v})}/></Field>
+                  <Field label="조명 (개)">         <Inp val={electric.lighting}     onChange={v=>setElectric({...electric,lighting:v})}     ph="0"/></Field>
+                  <Field label="재료단가 (/개)">    <Inp val={electric.lightingP}    onChange={v=>setElectric({...electric,lightingP:v})}/></Field>
+                  <Field label="시공단가 (/개)">    <Inp val={electric.lightingInstP} onChange={v=>setElectric({...electric,lightingInstP:v})}/></Field>
+                  <Field label="분전반 (개)">       <Inp val={electric.panel}        onChange={v=>setElectric({...electric,panel:v})}/></Field>
+                  <Field label="분전반 단가 (/개)"> <Inp val={electric.panelP}       onChange={v=>setElectric({...electric,panelP:v})}/></Field>
+                  <Field label="기타 금액">          <Inp val={electric.etcAmt}       onChange={v=>setElectric({...electric,etcAmt:v})}       ph="0"/></Field>
+                </div>
+                <Total label="전기 합계" val={costTotals.electric}/>
+              </Section>
+            )}
+
+            {/* 미장 */}
+            {selectedTrades.includes("plaster") && (
+              <Section title="🪣 미장">
+                <div style={S.grid3}>
+                  <Field label="미장 면적 (m²)"><Inp val={plaster.area}   onChange={v=>setPlaster({...plaster,area:v})}   ph="0"/></Field>
+                  <Field label="재료비 (/m²)">  <Inp val={plaster.matP}   onChange={v=>setPlaster({...plaster,matP:v})}/></Field>
+                  <Field label="시공비 (/m²)">  <Inp val={plaster.instP}  onChange={v=>setPlaster({...plaster,instP:v})}/></Field>
+                  <Field label="기타 금액">      <Inp val={plaster.etcAmt} onChange={v=>setPlaster({...plaster,etcAmt:v})} ph="0"/></Field>
+                </div>
+                <Total label="미장 합계" val={costTotals.plaster}/>
+              </Section>
+            )}
+
+            {/* 목공 — 모드 토글 */}
+            {selectedTrades.includes("carpentry") && (
+              <Section title="🪚 목공">
+                <ModeToggle mode={carpentry.mode||"calc"} onChange={v=>setCarpentry({...carpentry,mode:v})}/>
+                {(carpentry.mode||"calc")==="direct" ? (
+                  <div style={S.grid2}>
+                    <Field label="항목 메모"><input style={S.input} value={carpentry.directLabel||""} onChange={e=>setCarpentry({...carpentry,directLabel:e.target.value})} placeholder="천장 목공 + 걸레받이 등"/></Field>
+                    <Field label="총 금액 (원)"><Inp val={carpentry.directAmt} onChange={v=>setCarpentry({...carpentry,directAmt:v})} ph="0"/></Field>
+                  </div>
+                ) : (
+                  <React.Fragment>
+                    <div style={{fontSize:11,color:"#888",marginBottom:8}}>※ 단가 = 재료(경량철골·석고보드 등) + 시공 합산</div>
+                    <SubTitle c="천장·벽·파티션"/>
+                    <div style={S.grid3}>
+                      <Field label="천장 면적 (m²)"><Inp val={carpentry.ceilingArea}   onChange={v=>setCarpentry({...carpentry,ceilingArea:v})}   ph="0"/></Field>
+                      <Field label="합산단가 (/m²)"><Inp val={carpentry.ceilingP}      onChange={v=>setCarpentry({...carpentry,ceilingP:v})}/></Field>
+                      <Field label="벽 목공 (m²)"> <Inp val={carpentry.wallArea}      onChange={v=>setCarpentry({...carpentry,wallArea:v})}      ph="0"/></Field>
+                      <Field label="합산단가 (/m²)"><Inp val={carpentry.wallP}         onChange={v=>setCarpentry({...carpentry,wallP:v})}/></Field>
+                      <Field label="파티션 (m²)">  <Inp val={carpentry.partitionArea} onChange={v=>setCarpentry({...carpentry,partitionArea:v})} ph="0"/></Field>
+                      <Field label="합산단가 (/m²)"><Inp val={carpentry.partitionP}    onChange={v=>setCarpentry({...carpentry,partitionP:v})}/></Field>
+                    </div>
+                    <SubTitle c="몰딩·걸레받이"/>
+                    <div style={S.grid3}>
+                      <Field label="몰딩 (m)">     <Inp val={carpentry.moldingLen}   onChange={v=>setCarpentry({...carpentry,moldingLen:v})}   ph="0"/></Field>
+                      <Field label="재료비 (/m)">  <Inp val={carpentry.moldingP}     onChange={v=>setCarpentry({...carpentry,moldingP:v})}/></Field>
+                      <Field label="시공비 (/m)">  <Inp val={carpentry.moldingInstP} onChange={v=>setCarpentry({...carpentry,moldingInstP:v})}/></Field>
+                      <Field label="걸레받이 (m)"> <Inp val={carpentry.baseLen}      onChange={v=>setCarpentry({...carpentry,baseLen:v})}      ph="0"/></Field>
+                      <Field label="재료비 (/m)">  <Inp val={carpentry.baseP}        onChange={v=>setCarpentry({...carpentry,baseP:v})}/></Field>
+                      <Field label="시공비 (/m)">  <Inp val={carpentry.baseInstP}    onChange={v=>setCarpentry({...carpentry,baseInstP:v})}/></Field>
+                      <Field label="기타 금액">     <Inp val={carpentry.etcAmt}       onChange={v=>setCarpentry({...carpentry,etcAmt:v})}       ph="0"/></Field>
+                    </div>
+                  </React.Fragment>
+                )}
+                <Total label="목공 합계" val={costTotals.carpentry}/>
+              </Section>
+            )}
+
+            {/* 타일 — 행별 모드 토글 */}
+            {selectedTrades.includes("tile") && (
+              <Section title="⬜ 타일">
+                {tileRows.map((row,i)=>{
+                  const mode=row.mode||"calc";
+                  const c=calcTileRow(row), mat=TILE_MATS.find(m=>m.id===row.matId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={tileRows.length>1?()=>removeRow(setTileRows,row.id):null}/>
+                      <ModeToggle mode={mode} onChange={v=>updateRow(setTileRows,row.id,"mode",v)}/>
+                      {mode==="direct" ? (
+                        <div style={S.grid2}>
+                          <Field label="항목명/위치"><input style={S.input} value={row.label||""} onChange={e=>updateRow(setTileRows,row.id,"label",e.target.value)} placeholder="욕실 타일 등"/></Field>
+                          <Field label="금액 (원)"><Inp val={row.directAmt} onChange={v=>updateRow(setTileRows,row.id,"directAmt",v)} ph="0"/></Field>
+                        </div>
+                      ) : (
+                        <React.Fragment>
+                          <div style={S.grid3}>
+                            <Field label="공간명"><input style={S.input} value={row.space} onChange={e=>updateRow(setTileRows,row.id,"space",e.target.value)} placeholder="욕실1/주방..."/></Field>
+                            <Field label="위치">
+                              <select style={S.input} value={row.location} onChange={e=>updateRow(setTileRows,row.id,"location",e.target.value)}>
+                                {["바닥","벽","바닥+벽"].map(l=><option key={l}>{l}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="타일 종류">
+                              <select style={S.input} value={row.matId} onChange={e=>updateRow(setTileRows,row.id,"matId",e.target.value)}>
+                                {TILE_MATS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="면적 (m²)"><Inp val={row.area} onChange={v=>updateRow(setTileRows,row.id,"area",v)} ph="0"/></Field>
+                            <Field label={"재료단가 (장당·기본 "+fmt(mat?mat.matP:0)+"원)"}><Inp val={row.customMatP} onChange={v=>updateRow(setTileRows,row.id,"customMatP",v)} ph={fmt(mat?mat.matP:0)}/></Field>
+                            <Field label={"시공단가 (m²당·기본 "+fmt(mat?mat.instP:0)+"원)"}><Inp val={row.customInstP} onChange={v=>updateRow(setTileRows,row.id,"customInstP",v)} ph={fmt(mat?mat.instP:0)}/></Field>
+                          </div>
+                          {c&&!c.direct&&c.area>0&&(
+                            <div style={S.calcBox}>
+                              <CRow label={"할증("+(mat?(mat.loss*100).toFixed(0):0)+"%) 포함 수량"} val={c.qty.toLocaleString()+" "+c.mat.unit}/>
+                              <CRow label="m²당 재료비 환산" val={fmt(c.matPerSqm)+"원/m²"}/>
+                              <CRow label="재료비 합계" val={fmt(c.matCost)+"원"}/>
+                              <CRow label="시공비 합계" val={fmt(c.instCost)+"원"}/>
+                              <CRow label="소계" val={fmt(c.total)+"원"} hl={true}/>
+                            </div>
+                          )}
+                        </React.Fragment>
+                      )}
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setTileRows,{space:"",location:"바닥",matId:"t300",area:"",customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""})} c="+ 공간 추가"/>
+                <Total label="타일 합계" val={costTotals.tile}/>
+              </Section>
+            )}
+
+            {/* 위생기구 */}
+            {selectedTrades.includes("sanitary") && (
+              <Section title="🚿 위생기구">
+                {sanitaryRows.map((row,i)=>{
+                  const c=calcSanitaryRow(row), item=SANITARY_ITEMS.find(it=>it.id===row.itemId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={sanitaryRows.length>1?()=>removeRow(setSanitaryRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="품목">
+                          <select style={S.input} value={row.itemId} onChange={e=>updateRow(setSanitaryRows,row.id,"itemId",e.target.value)}>
+                            {SANITARY_ITEMS.map(it=><option key={it.id} value={it.id}>{it.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="수량 (개)"><Inp val={row.qty} onChange={v=>updateRow(setSanitaryRows,row.id,"qty",v)}/></Field>
+                        <Field label={"재료단가 (기본 "+fmt(item?item.defP:0)+"원)"}><Inp val={row.customMatP} onChange={v=>updateRow(setSanitaryRows,row.id,"customMatP",v)} ph={fmt(item?item.defP:0)}/></Field>
+                        <Field label={"시공단가 (기본 "+fmt(item?item.instP:0)+"원)"}><Inp val={row.customInstP} onChange={v=>updateRow(setSanitaryRows,row.id,"customInstP",v)} ph={fmt(item?item.instP:0)}/></Field>
+                        {c&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setSanitaryRows,{itemId:"wash",qty:"1",customMatP:"",customInstP:""})} c="+ 품목 추가"/>
+                <Total label="위생기구 합계" val={costTotals.sanitary}/>
+              </Section>
+            )}
+
+            {/* 바닥 — 행별 모드 토글 */}
+            {selectedTrades.includes("floor") && (
+              <Section title="🪵 바닥">
+                {floorRows.map((row,i)=>{
+                  const mode=row.mode||"calc";
+                  const c=calcFloorRow(row), mat=FLOOR_MATS.find(m=>m.id===row.matId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={floorRows.length>1?()=>removeRow(setFloorRows,row.id):null}/>
+                      <ModeToggle mode={mode} onChange={v=>updateRow(setFloorRows,row.id,"mode",v)}/>
+                      {mode==="direct" ? (
+                        <div style={S.grid2}>
+                          <Field label="항목명/위치"><input style={S.input} value={row.label||""} onChange={e=>updateRow(setFloorRows,row.id,"label",e.target.value)} placeholder="거실 강마루 등"/></Field>
+                          <Field label="금액 (원)"><Inp val={row.directAmt} onChange={v=>updateRow(setFloorRows,row.id,"directAmt",v)} ph="0"/></Field>
+                        </div>
+                      ) : (
+                        <React.Fragment>
+                          <div style={S.grid3}>
+                            <Field label="공간명"><input style={S.input} value={row.space} onChange={e=>updateRow(setFloorRows,row.id,"space",e.target.value)} placeholder="거실/방1..."/></Field>
+                            <Field label="재료">
+                              <select style={S.input} value={row.matId} onChange={e=>updateRow(setFloorRows,row.id,"matId",e.target.value)}>
+                                {FLOOR_MATS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="면적 (m²)"><Inp val={row.area} onChange={v=>updateRow(setFloorRows,row.id,"area",v)} ph="0"/></Field>
+                            <Field label={"재료단가 (장당·기본 "+fmt(mat?mat.matP:0)+"원)"}><Inp val={row.customMatP} onChange={v=>updateRow(setFloorRows,row.id,"customMatP",v)} ph={fmt(mat?mat.matP:0)}/></Field>
+                            <Field label={"시공단가 (m²당·기본 "+fmt(mat?mat.instP:0)+"원)"}><Inp val={row.customInstP} onChange={v=>updateRow(setFloorRows,row.id,"customInstP",v)} ph={fmt(mat?mat.instP:0)}/></Field>
+                          </div>
+                          {c&&!c.direct&&c.area>0&&(
+                            <div style={S.calcBox}>
+                              <CRow label={"할증("+(mat?(mat.loss*100).toFixed(0):0)+"%) 포함 수량"} val={c.qty.toLocaleString()+" "+c.mat.unit}/>
+                              <CRow label="m²당 재료비 환산" val={fmt(c.matPerSqm)+"원/m²"}/>
+                              <CRow label="재료비 합계" val={fmt(c.matCost)+"원"}/>
+                              <CRow label="시공비 합계" val={fmt(c.instCost)+"원"}/>
+                              <CRow label="소계" val={fmt(c.total)+"원"} hl={true}/>
+                            </div>
+                          )}
+                        </React.Fragment>
+                      )}
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setFloorRows,{space:"",matId:"wood",area:"",customMatP:"",customInstP:"",mode:"calc",label:"",directAmt:""})} c="+ 공간 추가"/>
+                <Total label="바닥 합계" val={costTotals.floor}/>
+              </Section>
+            )}
+
+            {/* 도장 */}
+            {selectedTrades.includes("paint") && (
+              <Section title="🖌️ 도장·페인트">
+                <div style={S.grid3}>
+                  <Field label="벽 면적 (m²)">        <Inp val={paint.wallArea}    onChange={v=>setPaint({...paint,wallArea:v})}    ph="0"/></Field>
+                  <Field label="도포 횟수">            <Inp val={paint.wallCoat}    onChange={v=>setPaint({...paint,wallCoat:v})}/></Field>
+                  <Field label="퍼티 단가 (/m²)">      <Inp val={paint.puttyP}      onChange={v=>setPaint({...paint,puttyP:v})}/></Field>
+                  <Field label="페인트 재료 (/m²/회)"> <Inp val={paint.paintMatP}   onChange={v=>setPaint({...paint,paintMatP:v})}/></Field>
+                  <Field label="시공비 (/m²)">         <Inp val={paint.paintInstP}  onChange={v=>setPaint({...paint,paintInstP:v})}/></Field>
+                  <Field label="천장 면적 (m²)">       <Inp val={paint.ceilingArea} onChange={v=>setPaint({...paint,ceilingArea:v})} ph="0"/></Field>
+                  <Field label="천장 재료 (/m²/회)">   <Inp val={paint.ceilMatP}    onChange={v=>setPaint({...paint,ceilMatP:v})}/></Field>
+                  <Field label="천장 시공비 (/m²)">    <Inp val={paint.ceilInstP}   onChange={v=>setPaint({...paint,ceilInstP:v})}/></Field>
+                  <Field label="기타 금액">             <Inp val={paint.etcAmt}      onChange={v=>setPaint({...paint,etcAmt:v})}      ph="0"/></Field>
+                </div>
+                <Total label="도장 합계" val={costTotals.paint}/>
+              </Section>
+            )}
+
+            {/* 필름·시트 — 행별 모드 토글 */}
+            {selectedTrades.includes("film") && (
+              <Section title="🎞️ 필름·시트">
+                {filmRows.map((row,i)=>{
+                  const mode=row.mode||"calc";
+                  const c=calcFilmRow(row);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={filmRows.length>1?()=>removeRow(setFilmRows,row.id):null}/>
+                      <ModeToggle mode={mode} onChange={v=>updateRow(setFilmRows,row.id,"mode",v)}/>
+                      {mode==="direct" ? (
+                        <div style={S.grid2}>
+                          <Field label="항목명/위치"><input style={S.input} value={row.label||""} onChange={e=>updateRow(setFilmRows,row.id,"label",e.target.value)} placeholder="거실 문 필름 등"/></Field>
+                          <Field label="금액 (원)"><Inp val={row.directAmt} onChange={v=>updateRow(setFilmRows,row.id,"directAmt",v)} ph="0"/></Field>
+                        </div>
+                      ) : (
+                        <div style={S.grid3}>
+                          <Field label="위치/부위"><input style={S.input} value={row.location} onChange={e=>updateRow(setFilmRows,row.id,"location",e.target.value)} placeholder="문/가구/벽..."/></Field>
+                          <Field label="종류">
+                            <select style={S.input} value={row.type} onChange={e=>updateRow(setFilmRows,row.id,"type",e.target.value)}>
+                              {["일반시트","우드시트","대리석시트","단색시트","칼라시트"].map(t=><option key={t}>{t}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="면적 (m²)">     <Inp val={row.area}  onChange={v=>updateRow(setFilmRows,row.id,"area",v)}  ph="0"/></Field>
+                          <Field label="재료단가 (/m²)"><Inp val={row.matP}  onChange={v=>updateRow(setFilmRows,row.id,"matP",v)}/></Field>
+                          <Field label="시공단가 (/m²)"><Inp val={row.instP} onChange={v=>updateRow(setFilmRows,row.id,"instP",v)}/></Field>
+                          {!c.direct&&c.area>0&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setFilmRows,{location:"",area:"",type:"일반시트",matP:15000,instP:18000,mode:"calc",label:"",directAmt:""})} c="+ 부위 추가"/>
+                <Total label="필름·시트 합계" val={costTotals.film}/>
+              </Section>
+            )}
+
+            {/* 도배 — 섹션 모드 토글 */}
+            {selectedTrades.includes("wallpaper") && (
+              <Section title="📋 도배">
+                <ModeToggle mode={wallpaper.mode||"calc"} onChange={v=>setWallpaper({...wallpaper,mode:v})}/>
+                {(wallpaper.mode||"calc")==="direct" ? (
+                  <div style={S.grid2}>
+                    <Field label="항목 메모"><input style={S.input} value={wallpaper.directLabel||""} onChange={e=>setWallpaper({...wallpaper,directLabel:e.target.value})} placeholder="도배 전체 등"/></Field>
+                    <Field label="총 금액 (원)"><Inp val={wallpaper.directAmt} onChange={v=>setWallpaper({...wallpaper,directAmt:v})} ph="0"/></Field>
+                  </div>
+                ) : (()=>{
+                  const c=calcWallpaper();
+                  return (
+                    <React.Fragment>
+                      <SubTitle c="벽지"/>
+                      <div style={S.grid3}>
+                        <Field label="벽지 종류">
+                          <select style={S.input} value={wallpaper.wallTypeId} onChange={e=>setWallpaper({...wallpaper,wallTypeId:e.target.value})}>
+                            {WALLPAPER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label} ({t.sqmPerRoll}m²/롤)</option>)}
+                          </select>
+                        </Field>
+                        <Field label="벽 면적 (m²)"><Inp val={wallpaper.wallArea}  onChange={v=>setWallpaper({...wallpaper,wallArea:v})}  ph="0"/></Field>
+                        <Field label="시공비 (/m²)"> <Inp val={wallpaper.wallInstP} onChange={v=>setWallpaper({...wallpaper,wallInstP:v})}/></Field>
+                      </div>
+                      <SubTitle c="천장지"/>
+                      <div style={S.grid3}>
+                        <Field label="천장지 종류">
+                          <select style={S.input} value={wallpaper.ceilTypeId} onChange={e=>setWallpaper({...wallpaper,ceilTypeId:e.target.value})}>
+                            {WALLPAPER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label} ({t.sqmPerRoll}m²/롤)</option>)}
+                          </select>
+                        </Field>
+                        <Field label="천장 면적 (m²)"><Inp val={wallpaper.ceilingArea} onChange={v=>setWallpaper({...wallpaper,ceilingArea:v})} ph="0"/></Field>
+                        <Field label="시공비 (/m²)">   <Inp val={wallpaper.ceilInstP}  onChange={v=>setWallpaper({...wallpaper,ceilInstP:v})}/></Field>
+                        <Field label="기타 금액">        <Inp val={wallpaper.etcAmt}     onChange={v=>setWallpaper({...wallpaper,etcAmt:v})}     ph="0"/></Field>
+                      </div>
+                      {(!c.direct)&&(parseFloat(wallpaper.wallArea)||parseFloat(wallpaper.ceilingArea))>0&&(
+                        <div style={S.calcBox}>
+                          <CRow label={"벽지 소요량 ("+c.wallType.sqmPerRoll+"m²/롤)"} val={c.wr+"롤 × "+fmt(c.wallType.defP)+"원 = "+fmt(c.wmc)+"원"}/>
+                          <CRow label={"천장지 소요량 ("+c.ceilType.sqmPerRoll+"m²/롤)"} val={c.cr+"롤 × "+fmt(c.ceilType.defP)+"원 = "+fmt(c.cmc)+"원"}/>
+                          <CRow label="벽 시공비" val={fmt(c.wic)+"원"}/>
+                          <CRow label="천장 시공비" val={fmt(c.cic)+"원"}/>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })()}
+                <Total label="도배 합계" val={costTotals.wallpaper}/>
+              </Section>
+            )}
+
+            {/* 가구 */}
+            {selectedTrades.includes("furniture") && (
+              <Section title="🛋️ 가구·붙박이">
+                {furnitureRows.map((row,i)=>{
+                  const c=calcFurnitureRow(row), item=FURNITURE_ITEMS.find(it=>it.id===row.itemId);
+                  return (
+                    <div key={row.id} style={S.rowBox}>
+                      <RowHeader idx={i} onRemove={furnitureRows.length>1?()=>removeRow(setFurnitureRows,row.id):null}/>
+                      <div style={S.grid3}>
+                        <Field label="품목">
+                          <select style={S.input} value={row.itemId} onChange={e=>updateRow(setFurnitureRows,row.id,"itemId",e.target.value)}>
+                            {FURNITURE_ITEMS.map(it=><option key={it.id} value={it.id}>{it.label} ({it.unit})</option>)}
+                          </select>
+                        </Field>
+                        <Field label="수량"><Inp val={row.qty} onChange={v=>updateRow(setFurnitureRows,row.id,"qty",v)}/></Field>
+                        <Field label={"단가 (기본 "+fmt(item?item.defP:0)+"원)"}><Inp val={row.customP} onChange={v=>updateRow(setFurnitureRows,row.id,"customP",v)} ph={fmt(item?item.defP:0)}/></Field>
+                        {c&&<Field label="소계"><div style={S.calcVal}>{fmt(c.total)}원</div></Field>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <AddBtn onClick={()=>addRow(setFurnitureRows,{itemId:"wardrobe",qty:"1",customP:""})} c="+ 품목 추가"/>
+                <Total label="가구 합계" val={costTotals.furniture}/>
+              </Section>
+            )}
+
+            {/* 기타공사 */}
+            {selectedTrades.includes("etc") && (
+              <Section title="📦 기타공사">
+                <div style={{fontSize:11,color:"#666",marginBottom:10}}>빔프로젝터 설치, 특수조명, 간판 등 위 공종에 해당 없는 항목</div>
+                {etcRows.map((row,i)=>(
+                  <div key={row.id} style={S.rowBox}>
+                    <RowHeader idx={i} onRemove={etcRows.length>1?()=>removeRow(setEtcRows,row.id):null}/>
+                    <div style={S.grid2}>
+                      <Field label="항목명"><input style={S.input} value={row.memo} onChange={e=>updateRow(setEtcRows,row.id,"memo",e.target.value)} placeholder="예) 빔프로젝터 설치, 청소비..."/></Field>
+                      <Field label="금액 (원)"><Inp val={row.amt} onChange={v=>updateRow(setEtcRows,row.id,"amt",v)} ph="0"/></Field>
+                    </div>
+                  </div>
+                ))}
+                <AddBtn onClick={()=>addRow(setEtcRows,{memo:"",amt:""})} c="+ 항목 추가"/>
+                <Total label="기타공사 합계" val={costTotals.etc}/>
+              </Section>
+            )}
+
+            <BtnRow>
+              <BtnSec onClick={()=>setStep(autoApplied?"info":"trades")}>← 이전</BtnSec>
+              <Btn onClick={()=>setStep("summary")}>다음 → 최종견적</Btn>
+            </BtnRow>
+          </div>
+        )}
+
+        {/* ─ STEP 4 ─ */}
+        {step==="summary" && (
+          <div>
+            <div style={S.card}>
+              <div style={S.cardTitle}>📋 현장 정보</div>
+              <div style={S.infoBox}>
+                {[
+                  ["현장명", siteInfo.name],
+                  ["유형",   siteInfo.type],
+                  ["면적",   siteInfo.area+"m² (약 "+Math.round(parseFloat(siteInfo.area||0)/3.305)+"평)"],
+                  ["고객명", siteInfo.client||"-"],
+                  ["작성일", siteInfo.date],
+                  siteInfo.memo?["특이사항",siteInfo.memo]:null,
+                ].filter(Boolean).map(([k,v])=>(
+                  <div key={k} style={S.infoRow}><span style={{color:"#666"}}>{k}</span><span style={{color:"#ddd"}}>{v}</span></div>
+                ))}
+              </div>
+            </div>
+
+            <div style={S.card}>
+              <div style={S.cardTitle}>💰 마진 설정</div>
+              <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                {MARGIN_PRESETS.map(p=>(
+                  <button key={p.rate} style={{padding:"8px 14px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+                    background:marginRate===p.rate?"#E8A020":"#1e1e1e",
+                    color:marginRate===p.rate?"#111":"#888",
+                    border:marginRate===p.rate?"none":"1px solid #2a2a2a"}}
+                    onClick={()=>setMarginRate(p.rate)}>
+                    {p.label} ({(p.rate*100).toFixed(0)}%)
+                  </button>
+                ))}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                <input type="range" min="0" max="50" value={Math.round(marginRate*100)}
+                  onChange={e=>setMarginRate(parseFloat(e.target.value)/100)}
+                  style={{flex:1,accentColor:"#E8A020"}}/>
+                <div style={{color:"#E8A020",fontWeight:700,fontSize:18,minWidth:52}}>{(marginRate*100).toFixed(0)}%</div>
+              </div>
+              <div style={{fontSize:11,color:"#555"}}>슬라이더로 직접 조정 가능</div>
+            </div>
+
+            <div style={S.card}>
+              <div style={S.cardTitle}>📊 공종별 원가</div>
+              <table style={S.table}>
+                <thead><tr>{["공종","원가"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {TRADES.filter(t=>selectedTrades.includes(t.id)).map(t=>(
+                    <tr key={t.id} style={{borderBottom:"1px solid #1e1e1e"}}>
+                      <td style={S.td}>{t.icon} {t.label}</td>
+                      <td style={{...S.tdR,color:costTotals[t.id]>0?"#ccc":"#444"}}>{fmt(costTotals[t.id])}원</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={S.totalSection}>
+                <div style={S.totalRow}><span>원가 합계</span><span>{fmt(costTotal)}원</span></div>
+                <div style={{...S.totalRow,color:"#88aa88"}}><span>마진 ({(marginRate*100).toFixed(0)}%)</span><span>+ {fmt(marginAmt)}원</span></div>
+                <div style={{...S.totalRow,color:"#fff",borderTop:"1px solid #333",paddingTop:10,marginTop:4}}><span>공급가액</span><span>{fmt(supplyPrice)}원</span></div>
+                <div style={S.totalRow}><span>부가세 (10%)</span><span>{fmt(vatAmt)}원</span></div>
+                <div style={{...S.totalRow,color:"#fff",fontWeight:700,fontSize:18,borderTop:"1px solid #444",paddingTop:12,marginTop:4,borderBottom:"none"}}>
+                  <span>최종 견적가 (VAT포함)</span>
+                  <span style={{color:"#E8A020"}}>{fmt(finalPrice)}원</span>
+                </div>
+              </div>
+              {parseFloat(siteInfo.area)>0 && (
+                <div style={S.perSqmBox}>
+                  {[
+                    ["원가", fmt(costTotal/parseFloat(siteInfo.area)), "원/m²", false],
+                    ["견적가", fmt(supplyPrice/parseFloat(siteInfo.area)), "원/m²", true],
+                    ["견적가", fmt(supplyPrice/(parseFloat(siteInfo.area)/3.305)), "원/평", true],
+                  ].map(([lbl,val,unit,hl],idx)=>(
+                    <React.Fragment key={idx}>
+                      {idx>0&&<div style={{width:1,background:"#2a2a2a"}}/>}
+                      <div style={S.perSqmItem}>
+                        <div style={{color:"#888",fontSize:10,marginBottom:2}}>{lbl}</div>
+                        <div style={{color:hl?"#E8A020":"#ccc",fontWeight:700,fontSize:16}}>{val}</div>
+                        <div style={{color:"#555",fontSize:11,marginTop:4}}>{unit}</div>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <BtnRow>
+              <BtnSec onClick={()=>setStep("detail")}>← 수정</BtnSec>
+              <button style={{...S.btnPrimary,background:"#1e1e1e",color:"#aaa",border:"1px solid #333"}} onClick={()=>window.print()}>🖨 인쇄</button>
+            </BtnRow>
+          </div>
+        )}
+      </main>
+      <footer style={{textAlign:"center",color:"#333",fontSize:12,padding:"20px 0 40px"}}>
+        M Design Works · 견적 산출 v7.1 · 16개 공종 · 면적계산 + 직접입력 · 2025 현시세
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
