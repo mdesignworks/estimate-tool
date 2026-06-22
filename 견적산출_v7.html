@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>M Design Works · 견적 산출 v7.1</title>
+  <title>M Design Works · 견적 산출 v7.2</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#E8A020">
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,7 +20,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel" data-presets="react,env">
-const { useState } = React;
+const { useState, useRef } = React;
 
 /* ── 현시세 반영 (2025) ── */
 const AUTO_CALC = {
@@ -153,6 +153,11 @@ const newId = () => Date.now() + Math.random();
 const r1    = (n) => Math.round(n*10)/10;
 const r0    = (n) => Math.round(n);
 
+/* ── 저장/불러오기 (브라우저 localStorage) ── */
+const STORAGE_KEY = "mdw_estimates_v7";
+const loadSavedList = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch(e){ return []; } };
+const saveSavedList = (arr) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); } catch(e){} };
+
 /* ── 스타일 ── */
 const S = {
   root:{minHeight:"100vh",background:"#0f0f0f",color:"#ddd",fontFamily:"'Apple SD Gothic Neo',sans-serif"},
@@ -241,6 +246,8 @@ function App(){
   const [step,         setStep]         = useState("info");
   const [autoApplied,  setAutoApplied]  = useState(false);
   const [marginRate,   setMarginRate]   = useState(0.25);
+  const [savedList,    setSavedList]    = useState(loadSavedList());
+  const fileInputRef = useRef(null);
 
   const [siteInfo, setSiteInfo] = useState({
     name:"", type:"아파트", area:"", client:"",
@@ -281,6 +288,72 @@ function App(){
   const addRow  = (setter,tmpl) => setter(p=>[...p,{...tmpl,id:newId()}]);
   const removeRow = (setter,id) => setter(p=>p.filter(r=>r.id!==id));
   const updateRow = (setter,id,f,v) => setter(p=>p.map(r=>r.id===id?{...r,[f]:v}:r));
+
+  /* ── 견적 저장/불러오기 ── */
+  const buildSnapshot = () => ({
+    siteInfo, selectedTrades, marginRate,
+    protectRows, demoRows, wasteRows, windowRows, plumbing, electric, plaster, carpentry,
+    tileRows, sanitaryRows, floorRows, paint, filmRows, wallpaper, furnitureRows, etcRows,
+  });
+  const restoreSnapshot = (snap) => {
+    if(!snap) return;
+    if(snap.siteInfo)        setSiteInfo(snap.siteInfo);
+    if(snap.selectedTrades)  setSelectedTrades(snap.selectedTrades);
+    if(snap.marginRate!=null)setMarginRate(snap.marginRate);
+    if(snap.protectRows)     setProtectRows(snap.protectRows);
+    if(snap.demoRows)        setDemoRows(snap.demoRows);
+    if(snap.wasteRows)       setWasteRows(snap.wasteRows);
+    if(snap.windowRows)      setWindowRows(snap.windowRows);
+    if(snap.plumbing)        setPlumbing(snap.plumbing);
+    if(snap.electric)        setElectric(snap.electric);
+    if(snap.plaster)         setPlaster(snap.plaster);
+    if(snap.carpentry)       setCarpentry(snap.carpentry);
+    if(snap.tileRows)        setTileRows(snap.tileRows);
+    if(snap.sanitaryRows)    setSanitaryRows(snap.sanitaryRows);
+    if(snap.floorRows)       setFloorRows(snap.floorRows);
+    if(snap.paint)           setPaint(snap.paint);
+    if(snap.filmRows)        setFilmRows(snap.filmRows);
+    if(snap.wallpaper)       setWallpaper(snap.wallpaper);
+    if(snap.furnitureRows)   setFurnitureRows(snap.furnitureRows);
+    if(snap.etcRows)         setEtcRows(snap.etcRows);
+    setAutoApplied(true);
+    setStep("detail");
+  };
+  const handleSaveToBrowser = () => {
+    const name = siteInfo.name || "무제 견적";
+    const entry = { id:newId(), name, client:siteInfo.client||"", savedAt:new Date().toISOString(), total:finalPrice, data:buildSnapshot() };
+    const next = [entry, ...savedList].slice(0,50);
+    setSavedList(next);
+    saveSavedList(next);
+    alert(`"${name}" 견적을 브라우저에 저장했습니다.`);
+  };
+  const handleDeleteSaved = (id) => {
+    const next = savedList.filter(e=>e.id!==id);
+    setSavedList(next);
+    saveSavedList(next);
+  };
+  const handleLoadSaved = (entry) => restoreSnapshot(entry.data);
+  const handleExportFile = () => {
+    const snap = buildSnapshot();
+    const blob = new Blob([JSON.stringify(snap,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeName = (siteInfo.name||"견적").replace(/[\\/:*?"<>|]/g,"_");
+    a.href = url; a.download = `${safeName}_견적_${siteInfo.date||""}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const handleImportFile = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try{ restoreSnapshot(JSON.parse(ev.target.result)); }
+      catch(err){ alert("파일을 읽을 수 없습니다. 올바른 견적 JSON 파일인지 확인하세요."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   /* ── 자동계산 ── */
   const applyAutoCalc = () => {
@@ -431,7 +504,7 @@ function App(){
           <div style={S.logo}>M</div>
           <div>
             <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>M Design Works</div>
-            <div style={{fontSize:12,color:"#666"}}>인테리어 견적 산출 v7.1</div>
+            <div style={{fontSize:12,color:"#666"}}>인테리어 견적 산출 v7.2</div>
           </div>
         </div>
         <div style={S.stepBar}>
@@ -450,6 +523,32 @@ function App(){
 
         {/* ─ STEP 1 ─ */}
         {step==="info" && (
+          <React.Fragment>
+          <div style={S.card}>
+            <div style={{...S.cardTitle,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>📂 견적 불러오기</span>
+              <button style={{...S.btnSecondary,padding:"7px 12px",fontSize:12}} onClick={()=>fileInputRef.current.click()}>📁 파일에서 불러오기</button>
+              <input ref={fileInputRef} type="file" accept=".json,application/json" style={{display:"none"}} onChange={handleImportFile}/>
+            </div>
+            {savedList.length>0 ? (
+              <div>
+                {savedList.map(e=>(
+                  <div key={e.id} style={{...S.rowBox,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                    <div>
+                      <div style={{color:"#fff",fontWeight:600,fontSize:13}}>{e.name}{e.client?` · ${e.client}`:""}</div>
+                      <div style={{color:"#666",fontSize:11,marginTop:3}}>{new Date(e.savedAt).toLocaleString("ko-KR")} · {fmt(e.total)}원</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button style={{...S.btnSecondary,padding:"7px 12px",fontSize:12}} onClick={()=>handleLoadSaved(e)}>불러오기</button>
+                      <button style={{background:"transparent",border:"none",color:"#664",fontSize:16,cursor:"pointer"}} onClick={()=>{if(window.confirm(`"${e.name}" 견적을 삭제할까요?`))handleDeleteSaved(e.id);}}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{color:"#555",fontSize:12}}>저장된 견적이 없습니다. 최종견적 단계에서 "브라우저에 저장"으로 저장할 수 있어요.</div>
+            )}
+          </div>
           <div style={S.card}>
             <div style={S.cardTitle}>현장 기본정보</div>
             <div style={S.grid2}>
@@ -494,6 +593,7 @@ function App(){
               <Btn onClick={()=>{if(!siteInfo.name||!siteInfo.area){alert("현장명·면적 필수");return;}setStep("trades");}}>수동 →</Btn>
             </BtnRow>
           </div>
+          </React.Fragment>
         )}
 
         {/* ─ STEP 2 ─ */}
@@ -1102,13 +1202,15 @@ function App(){
 
             <BtnRow>
               <BtnSec onClick={()=>setStep("detail")}>← 수정</BtnSec>
+              <button style={{...S.btnPrimary,background:"#1e1e1e",color:"#aaa",border:"1px solid #333"}} onClick={handleExportFile}>⬇ 파일로 저장</button>
+              <button style={{...S.btnPrimary,background:"#1a3a1a",color:"#88cc88",border:"1px solid #2a5a2a"}} onClick={handleSaveToBrowser}>💾 브라우저에 저장</button>
               <button style={{...S.btnPrimary,background:"#1e1e1e",color:"#aaa",border:"1px solid #333"}} onClick={()=>window.print()}>🖨 인쇄</button>
             </BtnRow>
           </div>
         )}
       </main>
       <footer style={{textAlign:"center",color:"#333",fontSize:12,padding:"20px 0 40px"}}>
-        M Design Works · 견적 산출 v7.1 · 16개 공종 · 면적계산 + 직접입력 · 2025 현시세
+        M Design Works · 견적 산출 v7.2 · 16개 공종 · 면적계산 + 직접입력 · 저장/불러오기 · 2025 현시세
       </footer>
     </div>
   );
