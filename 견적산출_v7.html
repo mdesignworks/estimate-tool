@@ -247,7 +247,10 @@ function App(){
   const [autoApplied,  setAutoApplied]  = useState(false);
   const [marginRate,   setMarginRate]   = useState(0.25);
   const [savedList,    setSavedList]    = useState(loadSavedList());
+  const [toast,        setToast]        = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const fileInputRef = useRef(null);
+  const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(""), 2200); };
 
   const [siteInfo, setSiteInfo] = useState({
     name:"", type:"아파트", area:"", client:"",
@@ -325,12 +328,13 @@ function App(){
     const next = [entry, ...savedList].slice(0,50);
     setSavedList(next);
     saveSavedList(next);
-    alert(`"${name}" 견적을 브라우저에 저장했습니다.`);
+    showToast(`"${name}" 견적을 브라우저에 저장했습니다.`);
   };
   const handleDeleteSaved = (id) => {
     const next = savedList.filter(e=>e.id!==id);
     setSavedList(next);
     saveSavedList(next);
+    setConfirmDeleteId(null);
   };
   const handleLoadSaved = (entry) => restoreSnapshot(entry.data);
   const handleExportFile = () => {
@@ -348,8 +352,8 @@ function App(){
     if(!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try{ restoreSnapshot(JSON.parse(ev.target.result)); }
-      catch(err){ alert("파일을 읽을 수 없습니다. 올바른 견적 JSON 파일인지 확인하세요."); }
+      try{ restoreSnapshot(JSON.parse(ev.target.result)); showToast("파일에서 견적을 불러왔습니다."); }
+      catch(err){ showToast("파일을 읽을 수 없습니다. 올바른 견적 JSON 파일인지 확인하세요."); }
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -540,7 +544,11 @@ function App(){
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       <button style={{...S.btnSecondary,padding:"7px 12px",fontSize:12}} onClick={()=>handleLoadSaved(e)}>불러오기</button>
-                      <button style={{background:"transparent",border:"none",color:"#664",fontSize:16,cursor:"pointer"}} onClick={()=>{if(window.confirm(`"${e.name}" 견적을 삭제할까요?`))handleDeleteSaved(e.id);}}>✕</button>
+                      {confirmDeleteId===e.id ? (
+                        <button style={{background:"#3a1a1a",border:"1px solid #663",color:"#f88",fontSize:11,fontWeight:600,borderRadius:6,padding:"7px 10px",cursor:"pointer"}} onClick={()=>handleDeleteSaved(e.id)}>삭제확인</button>
+                      ) : (
+                        <button style={{background:"transparent",border:"none",color:"#664",fontSize:16,cursor:"pointer"}} onClick={()=>{setConfirmDeleteId(e.id);setTimeout(()=>setConfirmDeleteId(null),3000);}}>✕</button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1212,6 +1220,11 @@ function App(){
       <footer style={{textAlign:"center",color:"#333",fontSize:12,padding:"20px 0 40px"}}>
         M Design Works · 견적 산출 v7.2 · 16개 공종 · 면적계산 + 직접입력 · 저장/불러오기 · 2025 현시세
       </footer>
+      {toast && (
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a3a1a",border:"1px solid #2a5a2a",color:"#9fdf9f",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.4)",zIndex:999}}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
