@@ -368,8 +368,9 @@ function App(){
     if(!pinCode || pinCode.length < 4) return;
     setCloudLoading(true);
     try {
-      const snap = await db.collection("estimates").where("pin","==",pinCode).orderBy("savedAt","desc").get();
-      const items = snap.docs.map(d=>({cloudId:d.id, ...d.data()}));
+      const snap = await db.collection("estimates").where("pin","==",pinCode).get();
+      const items = snap.docs.map(d=>({cloudId:d.id, ...d.data()}))
+        .sort((a,b)=>new Date(b.savedAt)-new Date(a.savedAt));
       setCloudList(items);
       localStorage.setItem("mdw_pin_v7", pinCode);
       setPin(pinCode);
