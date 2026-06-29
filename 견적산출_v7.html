@@ -853,7 +853,6 @@ function App(){
                   <Field label="분전반 (개)">       <Inp val={electric.panel}        onChange={v=>setElectric({...electric,panel:v})}/></Field>
                   <Field label="분전반 단가 (/개)"> <Inp val={electric.panelP}       onChange={v=>setElectric({...electric,panelP:v})}/></Field>
                   <Field label="기타 금액">          <Inp val={electric.etcAmt}       onChange={v=>setElectric({...electric,etcAmt:v})}       ph="0"/></Field>
-                </div>
                 </div>)}
                 <Total label="전기 합계" val={costTotals.electric}/>
               </Section>
@@ -873,7 +872,6 @@ function App(){
                   <Field label="재료비 (/m²)">  <Inp val={plaster.matP}   onChange={v=>setPlaster({...plaster,matP:v})}/></Field>
                   <Field label="시공비 (/m²)">  <Inp val={plaster.instP}  onChange={v=>setPlaster({...plaster,instP:v})}/></Field>
                   <Field label="기타 금액">      <Inp val={plaster.etcAmt} onChange={v=>setPlaster({...plaster,etcAmt:v})} ph="0"/></Field>
-                </div>
                 </div>)}
                 <Total label="미장 합계" val={costTotals.plaster}/>
               </Section>
@@ -1069,7 +1067,6 @@ function App(){
                   <Field label="천장 재료 (/m²/회)">   <Inp val={paint.ceilMatP}    onChange={v=>setPaint({...paint,ceilMatP:v})}/></Field>
                   <Field label="천장 시공비 (/m²)">    <Inp val={paint.ceilInstP}   onChange={v=>setPaint({...paint,ceilInstP:v})}/></Field>
                   <Field label="기타 금액">             <Inp val={paint.etcAmt}      onChange={v=>setPaint({...paint,etcAmt:v})}      ph="0"/></Field>
-                </div>
                 </div>)}
                 <Total label="도장 합계" val={costTotals.paint}/>
               </Section>
