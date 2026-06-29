@@ -16,6 +16,20 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js"></script>
+  <!-- Firebase compat v9 -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyBTi3uGL245ch1RMDVB1hwF8-dKE--NFho",
+      authDomain: "mdw-estimate-tool.firebaseapp.com",
+      projectId: "mdw-estimate-tool",
+      storageBucket: "mdw-estimate-tool.firebasestorage.app",
+      messagingSenderId: "96923605003",
+      appId: "1:96923605003:web:36f339a870e919b4254f0e"
+    });
+    const db = firebase.firestore();
+  </script>
 </head>
 <body>
   <div id="root"></div>
@@ -251,6 +265,11 @@ function App(){
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showSavedModal,  setShowSavedModal]  = useState(false);
   const fileInputRef = useRef(null);
+  const [pin,          setPin]          = useState(()=>localStorage.getItem("mdw_pin_v7")||"");
+  const [cloudList,    setCloudList]    = useState([]);
+  const [cloudLoading, setCloudLoading] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput,     setPinInput]     = useState("");
   const [directSections, setDirectSections] = useState({protection:false,demolition:false,waste:false,window:false,plumbing:false,electric:false,plaster:false,sanitary:false,paint:false,furniture:false});
   const [directAmts,     setDirectAmts]     = useState({protection:"",demolition:"",waste:"",window:"",plumbing:"",electric:"",plaster:"",sanitary:"",paint:"",furniture:""});
   const setDS = (id,v) => setDirectSections(p=>({...p,[id]:v}));
@@ -336,7 +355,40 @@ function App(){
     const next = [entry, ...savedList].slice(0,50);
     setSavedList(next);
     saveSavedList(next);
-    showToast(`"${name}" 견적을 브라우저에 저장했습니다.`);
+    const currentPin = localStorage.getItem("mdw_pin_v7");
+    if(currentPin) {
+      db.collection("estimates").add({ pin:currentPin, name, client:siteInfo.client||"", savedAt:entry.savedAt, total:finalPrice, data:buildSnapshot() })
+        .then(()=>showToast(`"${name}" 견적 저장 + ☁️ 클라우드 동기화 완료`))
+        .catch(()=>showToast(`"${name}" 견적 저장 완료 (클라우드 오류)`));
+    } else {
+      showToast(`"${name}" 견적을 브라우저에 저장했습니다.`);
+    }
+  };
+  const handleLoadFromCloud = async (pinCode) => {
+    if(!pinCode || pinCode.length < 4) return;
+    setCloudLoading(true);
+    try {
+      const snap = await db.collection("estimates").where("pin","==",pinCode).orderBy("savedAt","desc").get();
+      const items = snap.docs.map(d=>({cloudId:d.id, ...d.data()}));
+      setCloudList(items);
+      localStorage.setItem("mdw_pin_v7", pinCode);
+      setPin(pinCode);
+      if(items.length===0) showToast("해당 PIN의 클라우드 저장 견적이 없습니다.");
+      else showToast(`☁️ ${items.length}개 견적을 불러왔습니다.`);
+    } catch(e) {
+      showToast("클라우드 연결 오류: " + e.message);
+    }
+    setCloudLoading(false);
+    setShowPinModal(false);
+  };
+  const handleDeleteCloud = async (cloudId) => {
+    try {
+      await db.collection("estimates").doc(cloudId).delete();
+      setCloudList(prev=>prev.filter(e=>e.cloudId!==cloudId));
+      showToast("클라우드 견적 삭제 완료");
+    } catch(e) {
+      showToast("삭제 오류: " + e.message);
+    }
   };
   const handleDeleteSaved = (id) => {
     const next = savedList.filter(e=>e.id!==id);
@@ -1312,7 +1364,7 @@ function App(){
         )}
       </main>
       <footer style={{textAlign:"center",color:"#333",fontSize:12,padding:"20px 0 40px"}}>
-        M Design Works · 견적 산출 v7.2 · 16개 공종 · 면적계산 + 직접입력 · 저장/불러오기 · 2025 현시세
+        M Design Works · 견적 산출 v7.3 · 16개 공종 · 면적계산 + 직접입력 · 저장/불러오기 · ☁️ 클라우드 동기화
       </footer>
       {/* ─ 견적 목록 모달 ─ */}
       {showSavedModal && (
@@ -1323,6 +1375,10 @@ function App(){
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
                 <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>📂 저장된 견적</div>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <button style={{background:pin?"#1a2a3a":"#1e1e1e",border:pin?"1px solid #2a4a6a":"1px solid #2a2a2a",borderRadius:8,padding:"7px 12px",color:pin?"#6ab":"#aaa",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                    onClick={()=>{setPinInput(pin);setShowPinModal(true);}}>
+                    {pin ? "☁️ 연결됨" : "☁️ 클라우드"}
+                  </button>
                   <button style={{background:"#1e1e1e",border:"1px solid #2a2a2a",borderRadius:8,padding:"7px 12px",color:"#aaa",fontSize:12,fontWeight:600,cursor:"pointer"}}
                     onClick={()=>fileInputRef.current.click()}>
                     📁 파일에서 불러오기
@@ -1367,7 +1423,75 @@ function App(){
                   <span style={{fontSize:12,color:"#444"}}>헤더의 💾 저장 버튼으로 언제든 저장할 수 있어요.</span>
                 </div>
               )}
+
+              {/* 클라우드 견적 목록 */}
+              {cloudList.length>0 && (
+                <div style={{marginTop:20,borderTop:"1px solid #1a2a3a",paddingTop:16}}>
+                  <div style={{color:"#6ab",fontWeight:700,fontSize:13,marginBottom:10}}>☁️ 클라우드 견적 ({cloudList.length}개)</div>
+                  {cloudList.map(e=>(
+                    <div key={e.cloudId} style={{background:"#0a0f14",border:"1px solid #1a2a3a",borderRadius:10,padding:14,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{color:"#cce",fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}{e.client?` · ${e.client}`:""}</div>
+                        <div style={{color:"#445",fontSize:11,marginTop:4}}>{new Date(e.savedAt).toLocaleString("ko-KR")} · <span style={{color:"#E8A020"}}>{fmt(e.total)}원</span></div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button style={{background:"#E8A020",color:"#111",border:"none",borderRadius:7,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}
+                          onClick={()=>{handleLoadSaved({data:e.data});setShowSavedModal(false);}}>
+                          불러오기
+                        </button>
+                        <button style={{background:"transparent",border:"1px solid #2a2a2a",borderRadius:7,color:"#555",fontSize:14,cursor:"pointer",padding:"8px 10px"}}
+                          onClick={()=>handleDeleteCloud(e.cloudId)}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pin && cloudList.length===0 && (
+                <div style={{marginTop:16,textAlign:"center"}}>
+                  <button style={{background:"#0a1a2a",border:"1px solid #1a3a5a",borderRadius:8,color:"#6ab",padding:"10px 20px",fontSize:12,cursor:"pointer",fontWeight:600}}
+                    onClick={()=>handleLoadFromCloud(pin)}>
+                    {cloudLoading ? "로딩중..." : "☁️ 클라우드에서 새로고침"}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ PIN 모달 ─ */}
+      {showPinModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#161616",border:"1px solid #2a2a2a",borderRadius:14,padding:"24px 20px",width:"100%",maxWidth:360}}>
+            <div style={{fontWeight:700,fontSize:16,color:"#fff",marginBottom:8}}>☁️ 클라우드 동기화 PIN</div>
+            <div style={{color:"#888",fontSize:12,marginBottom:16,lineHeight:1.6}}>
+              PIN 번호로 기기 간 견적을 공유합니다.<br/>
+              <span style={{color:"#E8A020"}}>숫자 4~8자리를 입력하세요.</span>
+            </div>
+            <input
+              type="number"
+              value={pinInput}
+              onChange={e=>setPinInput(e.target.value.slice(0,8))}
+              placeholder="PIN 번호 입력"
+              style={{width:"100%",background:"#0f0f0f",border:"1px solid #333",borderRadius:8,padding:"12px 14px",color:"#fff",fontSize:18,letterSpacing:4,textAlign:"center",marginBottom:12,outline:"none"}}
+            />
+            {pin && <div style={{color:"#555",fontSize:11,textAlign:"center",marginBottom:12}}>현재 PIN: {"*".repeat(pin.length-2)+pin.slice(-2)}</div>}
+            <div style={{display:"flex",gap:8}}>
+              <button style={{flex:1,background:"#E8A020",color:"#111",border:"none",borderRadius:8,padding:"12px",fontWeight:700,fontSize:14,cursor:"pointer"}}
+                onClick={()=>handleLoadFromCloud(pinInput)}>
+                {cloudLoading ? "로딩중..." : "연결하기"}
+              </button>
+              <button style={{flex:1,background:"#1e1e1e",color:"#aaa",border:"1px solid #333",borderRadius:8,padding:"12px",fontWeight:600,fontSize:14,cursor:"pointer"}}
+                onClick={()=>{setShowPinModal(false);setPinInput("");}}>
+                취소
+              </button>
+            </div>
+            {pin && <button style={{width:"100%",background:"transparent",border:"1px solid #3a1a1a",color:"#f66",borderRadius:8,padding:"10px",marginTop:8,fontSize:12,cursor:"pointer"}}
+              onClick={()=>{localStorage.removeItem("mdw_pin_v7");setPin("");setCloudList([]);setShowPinModal(false);showToast("PIN 초기화됨");}}>
+              PIN 초기화 (클라우드 연결 해제)
+            </button>}
           </div>
         </div>
       )}
