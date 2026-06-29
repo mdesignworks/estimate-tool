@@ -249,7 +249,12 @@ function App(){
   const [savedList,    setSavedList]    = useState(loadSavedList());
   const [toast,        setToast]        = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [showSavedModal,  setShowSavedModal]  = useState(false);
   const fileInputRef = useRef(null);
+  const [directSections, setDirectSections] = useState({protection:false,demolition:false,waste:false,window:false,plumbing:false,electric:false,plaster:false,sanitary:false,paint:false,furniture:false});
+  const [directAmts,     setDirectAmts]     = useState({protection:"",demolition:"",waste:"",window:"",plumbing:"",electric:"",plaster:"",sanitary:"",paint:"",furniture:""});
+  const setDS = (id,v) => setDirectSections(p=>({...p,[id]:v}));
+  const setDA = (id,v) => setDirectAmts(p=>({...p,[id]:v}));
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(""), 2200); };
 
   const [siteInfo, setSiteInfo] = useState({
@@ -297,6 +302,7 @@ function App(){
     siteInfo, selectedTrades, marginRate,
     protectRows, demoRows, wasteRows, windowRows, plumbing, electric, plaster, carpentry,
     tileRows, sanitaryRows, floorRows, paint, filmRows, wallpaper, furnitureRows, etcRows,
+    directSections, directAmts,
   });
   const restoreSnapshot = (snap) => {
     if(!snap) return;
@@ -319,6 +325,8 @@ function App(){
     if(snap.wallpaper)       setWallpaper(snap.wallpaper);
     if(snap.furnitureRows)   setFurnitureRows(snap.furnitureRows);
     if(snap.etcRows)         setEtcRows(snap.etcRows);
+    if(snap.directSections)  setDirectSections(snap.directSections);
+    if(snap.directAmts)      setDirectAmts(snap.directAmts);
     setAutoApplied(true);
     setStep("detail");
   };
@@ -473,21 +481,21 @@ function App(){
   };
 
   const costTotals = {
-    protection: protectRows.reduce((s,r)=>{const c=calcProtectRow(r);return s+(c?c.total:0);},0),
-    demolition: demoRows.reduce((s,r)=>{const c=calcDemoRow(r);return s+(c?c.total:0);},0),
-    waste:      wasteRows.reduce((s,r)=>{const c=calcWasteRow(r);return s+(c?c.total:0);},0),
-    window:     windowRows.reduce((s,r)=>s+calcWindowRow(r).total,0),
-    plumbing:   calcPlumbing().total,
-    electric:   calcElectric().total,
-    plaster:    calcPlaster().total,
+    protection: directSections.protection?(parseFloat(directAmts.protection)||0):protectRows.reduce((s,r)=>{const c=calcProtectRow(r);return s+(c?c.total:0);},0),
+    demolition: directSections.demolition?(parseFloat(directAmts.demolition)||0):demoRows.reduce((s,r)=>{const c=calcDemoRow(r);return s+(c?c.total:0);},0),
+    waste:      directSections.waste?(parseFloat(directAmts.waste)||0):wasteRows.reduce((s,r)=>{const c=calcWasteRow(r);return s+(c?c.total:0);},0),
+    window:     directSections.window?(parseFloat(directAmts.window)||0):windowRows.reduce((s,r)=>s+calcWindowRow(r).total,0),
+    plumbing:   directSections.plumbing?(parseFloat(directAmts.plumbing)||0):calcPlumbing().total,
+    electric:   directSections.electric?(parseFloat(directAmts.electric)||0):calcElectric().total,
+    plaster:    directSections.plaster?(parseFloat(directAmts.plaster)||0):calcPlaster().total,
     carpentry:  calcCarpentry().total,
     tile:       tileRows.reduce((s,r)=>{const c=calcTileRow(r);return s+(c?c.total:0);},0),
-    sanitary:   sanitaryRows.reduce((s,r)=>{const c=calcSanitaryRow(r);return s+(c?c.total:0);},0),
+    sanitary:   directSections.sanitary?(parseFloat(directAmts.sanitary)||0):sanitaryRows.reduce((s,r)=>{const c=calcSanitaryRow(r);return s+(c?c.total:0);},0),
     floor:      floorRows.reduce((s,r)=>{const c=calcFloorRow(r);return s+(c?c.total:0);},0),
-    paint:      calcPaint().total,
+    paint:      directSections.paint?(parseFloat(directAmts.paint)||0):calcPaint().total,
     film:       filmRows.reduce((s,r)=>{const c=calcFilmRow(r);return s+(c?c.total:0);},0),
     wallpaper:  calcWallpaper().total,
-    furniture:  furnitureRows.reduce((s,r)=>{const c=calcFurnitureRow(r);return s+(c?c.total:0);},0),
+    furniture:  directSections.furniture?(parseFloat(directAmts.furniture)||0):furnitureRows.reduce((s,r)=>{const c=calcFurnitureRow(r);return s+(c?c.total:0);},0),
     etc:        etcRows.reduce((s,r)=>s+(parseFloat(r.amt)||0),0),
   };
   const costTotal   = selectedTrades.reduce((s,id)=>s+(costTotals[id]||0),0);
@@ -506,9 +514,20 @@ function App(){
       <header style={S.header}>
         <div style={S.headerTop}>
           <div style={S.logo}>M</div>
-          <div>
+          <div style={{flex:1}}>
             <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>M Design Works</div>
             <div style={{fontSize:12,color:"#666"}}>인테리어 견적 산출 v7.2</div>
+          </div>
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            <button style={{background:"#1e1e1e",border:"1px solid #2a2a2a",borderRadius:8,padding:"8px 12px",color:"#aaa",fontWeight:600,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}
+              onClick={()=>setShowSavedModal(true)}>
+              📂 {savedList.length>0?<span style={{background:"#E8A020",color:"#111",borderRadius:10,padding:"0 6px",fontSize:11,fontWeight:700}}>{savedList.length}</span>:""}
+              목록
+            </button>
+            <button style={{background:"#1a3a1a",border:"1px solid #2a5a2a",borderRadius:8,padding:"8px 12px",color:"#88cc88",fontWeight:600,fontSize:12,cursor:"pointer"}}
+              onClick={()=>{if(!siteInfo.name){showToast("현장명을 먼저 입력하세요.");return;}handleSaveToBrowser();}}>
+              💾 저장
+            </button>
           </div>
         </div>
         <div style={S.stepBar}>
@@ -598,7 +617,7 @@ function App(){
                 onClick={()=>{if(!siteInfo.name||!siteInfo.area){alert("현장명·면적 필수");return;}applyAutoCalc();}}>
                 ⚡ 자동계산 적용
               </button>
-              <Btn onClick={()=>{if(!siteInfo.name||!siteInfo.area){alert("현장명·면적 필수");return;}setStep("trades");}}>수동 →</Btn>
+              <Btn onClick={()=>{if(!siteInfo.name){alert("현장명을 입력하세요");return;}setStep("trades");}}>수동 →</Btn>
             </BtnRow>
           </div>
           </React.Fragment>
@@ -641,6 +660,13 @@ function App(){
             {/* 보양 */}
             {selectedTrades.includes("protection") && (
               <Section title="🛡️ 보양">
+                <ModeToggle mode={directSections.protection?"direct":"calc"} onChange={v=>setDS("protection",v==="direct")}/>
+                {directSections.protection ? (
+                  <div style={S.grid2}>
+                    <Field label="보양 총금액 (원)"><Inp val={directAmts.protection} onChange={v=>setDA("protection",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.protection)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.protection))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {protectRows.map((row,i)=>{
                   const mat=PROTECT_MATS.find(m=>m.id===row.matId), c=calcProtectRow(row);
                   return (
@@ -666,6 +692,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setProtectRows,{location:"",matId:"cardboard",qty:"",unit:"m²",customP:""})} c="+ 항목 추가"/>
+                </React.Fragment>)}
                 <Total label="보양 합계" val={costTotals.protection}/>
               </Section>
             )}
@@ -673,6 +700,13 @@ function App(){
             {/* 철거 */}
             {selectedTrades.includes("demolition") && (
               <Section title="🔨 철거">
+                <ModeToggle mode={directSections.demolition?"direct":"calc"} onChange={v=>setDS("demolition",v==="direct")}/>
+                {directSections.demolition ? (
+                  <div style={S.grid2}>
+                    <Field label="철거 총금액 (원)"><Inp val={directAmts.demolition} onChange={v=>setDA("demolition",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.demolition)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.demolition))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {demoRows.map((row,i)=>{
                   const c=calcDemoRow(row), item=DEMO_ITEMS.find(it=>it.id===row.itemId);
                   return (
@@ -692,6 +726,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setDemoRows,{itemId:"wall",qty:"",customP:""})} c="+ 항목 추가"/>
+                </React.Fragment>)}
                 <Total label="철거 합계" val={costTotals.demolition}/>
               </Section>
             )}
@@ -699,6 +734,13 @@ function App(){
             {/* 폐기물 */}
             {selectedTrades.includes("waste") && (
               <Section title="🚛 폐기물 처리">
+                <ModeToggle mode={directSections.waste?"direct":"calc"} onChange={v=>setDS("waste",v==="direct")}/>
+                {directSections.waste ? (
+                  <div style={S.grid2}>
+                    <Field label="폐기물 총금액 (원)"><Inp val={directAmts.waste} onChange={v=>setDA("waste",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.waste)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.waste))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {wasteRows.map((row,i)=>{
                   const c=calcWasteRow(row), item=WASTE_ITEMS.find(it=>it.id===row.itemId);
                   return (
@@ -718,6 +760,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setWasteRows,{itemId:"truck1",qty:"",customP:""})} c="+ 항목 추가"/>
+                </React.Fragment>)}
                 <Total label="폐기물 합계" val={costTotals.waste}/>
               </Section>
             )}
@@ -725,6 +768,13 @@ function App(){
             {/* 창호 */}
             {selectedTrades.includes("window") && (
               <Section title="🪟 창호·샷시">
+                <ModeToggle mode={directSections.window?"direct":"calc"} onChange={v=>setDS("window",v==="direct")}/>
+                {directSections.window ? (
+                  <div style={S.grid2}>
+                    <Field label="창호 총금액 (원)"><Inp val={directAmts.window} onChange={v=>setDA("window",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.window)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.window))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {windowRows.map((row,i)=>{
                   const c=calcWindowRow(row), wt=WINDOW_TYPES.find(t=>t.id===row.typeId);
                   return (
@@ -745,6 +795,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setWindowRows,{typeId:"pvc_double",label:"",qty:"",customP:""})} c="+ 창호 추가"/>
+                </React.Fragment>)}
                 <Total label="창호 합계" val={costTotals.window}/>
               </Section>
             )}
@@ -752,6 +803,13 @@ function App(){
             {/* 설비 */}
             {selectedTrades.includes("plumbing") && (
               <Section title="🔧 설비·배관">
+                <ModeToggle mode={directSections.plumbing?"direct":"calc"} onChange={v=>setDS("plumbing",v==="direct")}/>
+                {directSections.plumbing ? (
+                  <div style={S.grid2}>
+                    <Field label="설비 총금액 (원)"><Inp val={directAmts.plumbing} onChange={v=>setDA("plumbing",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.plumbing)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.plumbing))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 <SubTitle c="배관 길이"/>
                 <div style={S.grid3}>
                   <Field label="급수 배관 (m)"><Inp val={plumbing.hotLen}     onChange={v=>setPlumbing({...plumbing,hotLen:v})}     ph="0"/></Field>
@@ -768,6 +826,7 @@ function App(){
                   <Field label="주방 세팅비 (/개)"> <Inp val={plumbing.kitchenSetP} onChange={v=>setPlumbing({...plumbing,kitchenSetP:v})}/></Field>
                   <Field label="기타 금액">          <Inp val={plumbing.etcAmt}      onChange={v=>setPlumbing({...plumbing,etcAmt:v})}      ph="0"/></Field>
                 </div>
+                </React.Fragment>)}
                 <Total label="설비 합계" val={costTotals.plumbing}/>
               </Section>
             )}
@@ -775,7 +834,13 @@ function App(){
             {/* 전기 */}
             {selectedTrades.includes("electric") && (
               <Section title="⚡ 전기">
-                <div style={S.grid3}>
+                <ModeToggle mode={directSections.electric?"direct":"calc"} onChange={v=>setDS("electric",v==="direct")}/>
+                {directSections.electric ? (
+                  <div style={S.grid2}>
+                    <Field label="전기 총금액 (원)"><Inp val={directAmts.electric} onChange={v=>setDA("electric",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.electric)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.electric))}원</div></Field>}
+                  </div>
+                ) : (<div style={S.grid3}>
                   <Field label="콘센트 (개)">       <Inp val={electric.outlet}       onChange={v=>setElectric({...electric,outlet:v})}       ph="0"/></Field>
                   <Field label="재료단가 (/개)">    <Inp val={electric.outletP}      onChange={v=>setElectric({...electric,outletP:v})}/></Field>
                   <Field label="시공단가 (/개)">    <Inp val={electric.outletInstP}  onChange={v=>setElectric({...electric,outletInstP:v})}/></Field>
@@ -789,6 +854,7 @@ function App(){
                   <Field label="분전반 단가 (/개)"> <Inp val={electric.panelP}       onChange={v=>setElectric({...electric,panelP:v})}/></Field>
                   <Field label="기타 금액">          <Inp val={electric.etcAmt}       onChange={v=>setElectric({...electric,etcAmt:v})}       ph="0"/></Field>
                 </div>
+                </div>)}
                 <Total label="전기 합계" val={costTotals.electric}/>
               </Section>
             )}
@@ -796,12 +862,19 @@ function App(){
             {/* 미장 */}
             {selectedTrades.includes("plaster") && (
               <Section title="🪣 미장">
-                <div style={S.grid3}>
+                <ModeToggle mode={directSections.plaster?"direct":"calc"} onChange={v=>setDS("plaster",v==="direct")}/>
+                {directSections.plaster ? (
+                  <div style={S.grid2}>
+                    <Field label="미장 총금액 (원)"><Inp val={directAmts.plaster} onChange={v=>setDA("plaster",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.plaster)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.plaster))}원</div></Field>}
+                  </div>
+                ) : (<div style={S.grid3}>
                   <Field label="미장 면적 (m²)"><Inp val={plaster.area}   onChange={v=>setPlaster({...plaster,area:v})}   ph="0"/></Field>
                   <Field label="재료비 (/m²)">  <Inp val={plaster.matP}   onChange={v=>setPlaster({...plaster,matP:v})}/></Field>
                   <Field label="시공비 (/m²)">  <Inp val={plaster.instP}  onChange={v=>setPlaster({...plaster,instP:v})}/></Field>
                   <Field label="기타 금액">      <Inp val={plaster.etcAmt} onChange={v=>setPlaster({...plaster,etcAmt:v})} ph="0"/></Field>
                 </div>
+                </div>)}
                 <Total label="미장 합계" val={costTotals.plaster}/>
               </Section>
             )}
@@ -898,6 +971,13 @@ function App(){
             {/* 위생기구 */}
             {selectedTrades.includes("sanitary") && (
               <Section title="🚿 위생기구">
+                <ModeToggle mode={directSections.sanitary?"direct":"calc"} onChange={v=>setDS("sanitary",v==="direct")}/>
+                {directSections.sanitary ? (
+                  <div style={S.grid2}>
+                    <Field label="위생기구 총금액 (원)"><Inp val={directAmts.sanitary} onChange={v=>setDA("sanitary",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.sanitary)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.sanitary))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {sanitaryRows.map((row,i)=>{
                   const c=calcSanitaryRow(row), item=SANITARY_ITEMS.find(it=>it.id===row.itemId);
                   return (
@@ -918,6 +998,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setSanitaryRows,{itemId:"wash",qty:"1",customMatP:"",customInstP:""})} c="+ 품목 추가"/>
+                </React.Fragment>)}
                 <Total label="위생기구 합계" val={costTotals.sanitary}/>
               </Section>
             )}
@@ -972,7 +1053,13 @@ function App(){
             {/* 도장 */}
             {selectedTrades.includes("paint") && (
               <Section title="🖌️ 도장·페인트">
-                <div style={S.grid3}>
+                <ModeToggle mode={directSections.paint?"direct":"calc"} onChange={v=>setDS("paint",v==="direct")}/>
+                {directSections.paint ? (
+                  <div style={S.grid2}>
+                    <Field label="도장 총금액 (원)"><Inp val={directAmts.paint} onChange={v=>setDA("paint",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.paint)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.paint))}원</div></Field>}
+                  </div>
+                ) : (<div style={S.grid3}>
                   <Field label="벽 면적 (m²)">        <Inp val={paint.wallArea}    onChange={v=>setPaint({...paint,wallArea:v})}    ph="0"/></Field>
                   <Field label="도포 횟수">            <Inp val={paint.wallCoat}    onChange={v=>setPaint({...paint,wallCoat:v})}/></Field>
                   <Field label="퍼티 단가 (/m²)">      <Inp val={paint.puttyP}      onChange={v=>setPaint({...paint,puttyP:v})}/></Field>
@@ -983,6 +1070,7 @@ function App(){
                   <Field label="천장 시공비 (/m²)">    <Inp val={paint.ceilInstP}   onChange={v=>setPaint({...paint,ceilInstP:v})}/></Field>
                   <Field label="기타 금액">             <Inp val={paint.etcAmt}      onChange={v=>setPaint({...paint,etcAmt:v})}      ph="0"/></Field>
                 </div>
+                </div>)}
                 <Total label="도장 합계" val={costTotals.paint}/>
               </Section>
             )}
@@ -1076,6 +1164,13 @@ function App(){
             {/* 가구 */}
             {selectedTrades.includes("furniture") && (
               <Section title="🛋️ 가구·붙박이">
+                <ModeToggle mode={directSections.furniture?"direct":"calc"} onChange={v=>setDS("furniture",v==="direct")}/>
+                {directSections.furniture ? (
+                  <div style={S.grid2}>
+                    <Field label="가구 총금액 (원)"><Inp val={directAmts.furniture} onChange={v=>setDA("furniture",v)} ph="0"/></Field>
+                    {parseFloat(directAmts.furniture)>0&&<Field label="소계"><div style={S.calcVal}>{fmt(parseFloat(directAmts.furniture))}원</div></Field>}
+                  </div>
+                ) : (<React.Fragment>
                 {furnitureRows.map((row,i)=>{
                   const c=calcFurnitureRow(row), item=FURNITURE_ITEMS.find(it=>it.id===row.itemId);
                   return (
@@ -1095,6 +1190,7 @@ function App(){
                   );
                 })}
                 <AddBtn onClick={()=>addRow(setFurnitureRows,{itemId:"wardrobe",qty:"1",customP:""})} c="+ 품목 추가"/>
+                </React.Fragment>)}
                 <Total label="가구 합계" val={costTotals.furniture}/>
               </Section>
             )}
@@ -1209,6 +1305,7 @@ function App(){
             </div>
 
             <BtnRow>
+              <BtnSec onClick={()=>setStep("info")}>🏠 홈으로</BtnSec>
               <BtnSec onClick={()=>setStep("detail")}>← 수정</BtnSec>
               <button style={{...S.btnPrimary,background:"#1e1e1e",color:"#aaa",border:"1px solid #333"}} onClick={handleExportFile}>⬇ 파일로 저장</button>
               <button style={{...S.btnPrimary,background:"#1a3a1a",color:"#88cc88",border:"1px solid #2a5a2a"}} onClick={handleSaveToBrowser}>💾 브라우저에 저장</button>
@@ -1220,8 +1317,66 @@ function App(){
       <footer style={{textAlign:"center",color:"#333",fontSize:12,padding:"20px 0 40px"}}>
         M Design Works · 견적 산출 v7.2 · 16개 공종 · 면적계산 + 직접입력 · 저장/불러오기 · 2025 현시세
       </footer>
+      {/* ─ 견적 목록 모달 ─ */}
+      {showSavedModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          <div style={{maxWidth:640,margin:"0 auto",padding:"20px 16px 60px"}}>
+            <div style={{background:"#161616",border:"1px solid #222",borderRadius:12,padding:"20px 18px"}}>
+              {/* 모달 헤더 */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>📂 저장된 견적</div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <button style={{background:"#1e1e1e",border:"1px solid #2a2a2a",borderRadius:8,padding:"7px 12px",color:"#aaa",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                    onClick={()=>fileInputRef.current.click()}>
+                    📁 파일에서 불러오기
+                  </button>
+                  <button style={{background:"transparent",border:"none",color:"#666",fontSize:22,cursor:"pointer",lineHeight:1,padding:"0 4px"}}
+                    onClick={()=>setShowSavedModal(false)}>✕</button>
+                </div>
+              </div>
+
+              {/* 목록 */}
+              {savedList.length>0 ? (
+                <div>
+                  {savedList.map(e=>(
+                    <div key={e.id} style={{background:"#0f0f0f",border:"1px solid #222",borderRadius:10,padding:14,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{color:"#fff",fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}{e.client?` · ${e.client}`:""}</div>
+                        <div style={{color:"#555",fontSize:11,marginTop:4}}>{new Date(e.savedAt).toLocaleString("ko-KR")} · <span style={{color:"#E8A020"}}>{fmt(e.total)}원</span></div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button style={{background:"#E8A020",color:"#111",border:"none",borderRadius:7,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}
+                          onClick={()=>{handleLoadSaved(e);setShowSavedModal(false);}}>
+                          불러오기
+                        </button>
+                        {confirmDeleteId===e.id ? (
+                          <button style={{background:"#3a1a1a",border:"1px solid #663",color:"#f88",fontSize:11,fontWeight:600,borderRadius:7,padding:"8px 10px",cursor:"pointer"}}
+                            onClick={()=>handleDeleteSaved(e.id)}>
+                            삭제확인
+                          </button>
+                        ) : (
+                          <button style={{background:"transparent",border:"1px solid #2a2a2a",borderRadius:7,color:"#555",fontSize:14,cursor:"pointer",padding:"8px 10px"}}
+                            onClick={()=>{setConfirmDeleteId(e.id);setTimeout(()=>setConfirmDeleteId(null),3000);}}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{color:"#555",fontSize:13,padding:"30px 0",textAlign:"center"}}>
+                  저장된 견적이 없습니다.<br/>
+                  <span style={{fontSize:12,color:"#444"}}>헤더의 💾 저장 버튼으로 언제든 저장할 수 있어요.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
-        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a3a1a",border:"1px solid #2a5a2a",color:"#9fdf9f",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.4)",zIndex:999}}>
+        <div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1a3a1a",border:"1px solid #2a5a2a",color:"#9fdf9f",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.4)",zIndex:1001}}>
           {toast}
         </div>
       )}
